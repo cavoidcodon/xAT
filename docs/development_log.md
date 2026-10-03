@@ -199,3 +199,43 @@ After both runs, `ps` shows no `pyocd gdbserver` or `LinkServer gdbserver` proce
   the UART.
 - LinkServer leaves its shared `redlinkserv` daemon running after flash/reset commands.
   That is by design and not a GDB server.
+
+## 2026-10-03: TASK-002 project skeleton and Claude Code structure
+
+### Summary
+
+- Renamed `claude/` to `.claude/`, so Claude Code loads rules, skills and agents
+  automatically.
+- Created the AUTOSAR folder skeleton: `src/{platform,mcal,bsw,os,rte,app,ecu}`, with
+  `include/ src/ config/` for each planned module, plus `tests/{unit,target}`,
+  `third_party/` and `cmake/`. Empty directories hold a `.gitkeep`.
+- Rewrote `.claude/rules/coding_rules.md` to follow AUTOSAR R21-11 and MISRA C:2012. It
+  covers naming (SWS names take precedence), types, file structure, published version
+  info, DET, control flow and formatting, and lists the project deviations DEV-01..03.
+- Added the path-scoped rules `layering.md`, `mcal_rules.md`, `app_rules.md` and
+  `testing_rules.md`.
+- Added the skills `new-module` (with code, test and doc templates), `module-task` and
+  `verify`.
+- Added `.claude/tasks/TASK_TEMPLATE.md` and `.claude/tasks/backlog.md`.
+- Added `docs/architecture/overview.md`, `docs/autosar_compliance.md` and
+  `docs/references/autosar/README.md` (the PDFs are git-ignored), plus
+  `third_party/README.md`.
+- Updated `CLAUDE.md` with the AUTOSAR release, the test framework, the repository
+  layout, and the new rules/skills paths.
+
+### Decisions (user, 2026-10-03)
+
+- AUTOSAR release: **R21-11** (AR 4.7.0). Unit tests: **Unity + CMock**.
+- For SWS-defined names, the AUTOSAR naming takes precedence over the project naming
+  rules.
+- Removed the bring-up firmware `src/hello_uart` (and its build output). The project
+  starts directly with AUTOSAR code. The firmware entry is now `src/ecu`, and the default
+  `--app` in `scripts/operations.py` and the VS Code CMake source directory were changed
+  to match. The out-of-tree SDK build notes were kept in `docs/operations.md`.
+- `tests/scripts/test_operations.py` was deleted by the user and will not be restored.
+  The Tests section of `docs/operations.md` was removed.
+
+### Verification
+
+None was requested for this skeleton task. Note that `ops build` fails until TASK-003
+adds `src/ecu/CMakeLists.txt`.

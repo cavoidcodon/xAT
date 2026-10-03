@@ -22,7 +22,7 @@ python3 scripts/operations.py <command> [options]
 | `run [--clean] [--flasher …] [--expect TEXT] [--timeout S]` | Smoke test: build, open UART, flash and reset, wait for `boot OK`. |
 
 Global options go **before** the command: `--config debug|release`,
-`--app src/hello_uart`, `--sdk`, `--armgcc`, `--board`, `--core`, `-v` (shows the output
+`--app src/ecu`, `--sdk`, `--armgcc`, `--board`, `--core`, `-v` (shows the output
 of every tool).
 
 Examples:
@@ -33,7 +33,7 @@ python3 scripts/operations.py --config release build
 python3 scripts/operations.py flash --flasher linkserver
 python3 scripts/operations.py monitor --expect "boot OK" --timeout 10
 python3 scripts/operations.py debug                                   # interactive (gdb)
-python3 scripts/operations.py debug --batch src/hello_uart/gdb/smoke_test.gdb
+python3 scripts/operations.py debug --batch <script.gdb>
 python3 scripts/operations.py run
 ```
 
@@ -235,26 +235,23 @@ class OpenOcdFlash(FlashStrategy):
 FLASHERS[OpenOcdFlash.name] = OpenOcdFlash   # the only other line needed
 ```
 
-`test_registry_open_for_new_backend` in `tests/scripts/test_operations.py` registers such
-a class and checks that `auto`, the CLI parser and `Target.flash()` all pick it up.
 
-## Smoke-test firmware and GDB script
+## Firmware build notes (out-of-tree SDK build)
 
-- `src/hello_uart/` is built out of tree with
-  `PROJECT_BOARD_PORT_PATH=examples/_boards/frdmmcxn947/demo_apps/hello_world`. This reuses
-  the SDK's `hardware_init.c` (`BOARD_InitHardware`), `pin_mux.c`, `app.h`, `board.c` and
-  `clock_config.c`, so **no SDK file is copied**.
-- The debug build adds `-g3` (the SDK debug config only has `-O0 -g`). `main.c` is compiled
-  with `-std=c11`; SDK sources keep the vendor `-std=gnu99`.
-- `src/hello_uart/gdb/smoke_test.gdb`: runs to `main`, reads `g_tickCount`, steps, resumes
-  until one tick has been printed (`g_tickCount >= 1`, otherwise `quit 1`), then detaches.
+The default app is `src/ecu` (the AUTOSAR firmware entry, created in TASK-003). The
+bring-up firmware `src/hello_uart` from TASK-001 was removed in TASK-002. These facts
+from the bring-up still apply to `src/ecu/CMakeLists.txt`:
 
-## Tests
-
-```sh
-.venv/bin/python -m pytest tests/scripts
-```
-
-47 tests. They cover every strategy class, `Target`, the registry and `auto` selection,
-`Config` layering, `CommandRunner`, `SerialMonitor`, `GdbClient`, the ELF segment reader
-and the CLI. They need no hardware and no external tools.
+- The project is built out of tree. It sets
+  `PROJECT_BOARD_PORT_PATH=examples/_boards/frdmmcxn947/demo_apps/hello_world`, which is
+  resolved relative to `SdkRootDirPath`. This reuses the SDK's `hardware_init.c`
+  (`BOARD_InitHardware`), `pin_mux.c`, `app.h`, `board.c` and `clock_config.c`, so **no
+  SDK file is copied**.
+- Skeleton: `include(${SdkRootDirPath}/cmake/extension/mcux.cmake)`, then
+  `project(<name> LANGUAGES C CXX ASM PROJECT_BOARD_PORT_PATH ...)`,
+  `include(${SdkRootDirPath}/CMakeLists.txt)`, `mcux_add_source(...)`, the optional
+  board `reconfig.cmake`, and `mcux_convert_binary(...)`.
+- The debug build adds `-g3` with `mcux_add_configuration(TARGETS debug CC "-g3" TOOLCHAINS armgcc)`,
+  because the SDK debug config only has `-O0 -g`. Project sources are compiled with
+  `-std=c11`, and SDK sources keep the vendor `-std=gnu99`.
+- The image is named `<app dir name>_<core_id>`, for example `ecu_cm33_core0.elf`.

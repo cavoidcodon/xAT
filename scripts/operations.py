@@ -3,7 +3,7 @@
 
 Single-file tool. Run from the xAT root:
     python3 scripts/operations.py doctor
-    python3 scripts/operations.py build   [--config debug|release] [--clean] [--app src/hello_uart]
+    python3 scripts/operations.py build   [--config debug|release] [--clean] [--app src/ecu]
     python3 scripts/operations.py flash   [--flasher auto|pyocd|linkserver|jlink] [--probe UID] [--no-verify]
     python3 scripts/operations.py debug   [--debugger auto|pyocd|linkserver|jlink] [--batch FILE] [--port 3333]
     python3 scripts/operations.py monitor [--port /dev/ttyACM0] [--baud 115200] [--expect TEXT] [--timeout 10]
@@ -57,7 +57,7 @@ class Defaults:
 
     board: str = "frdmmcxn947"
     core_id: str = "cm33_core0"
-    app: str = "src/hello_uart"
+    app: str = "src/ecu"
     build_config: str = "debug"
     sdk_dir_name: str = "mcuxsdk"  # <workspace>/mcuxsdk
     toolchain_glob: str = "tools/arm-gnu-toolchain-*-arm-none-eabi"  # under <workspace>

@@ -12,6 +12,9 @@ with AUTOSAR compliance.
 - Base platform: Ubuntu using SDK from NXP for FRDM-MCXN947
 - Initial execution model: single core
 - Configuration for AUTOSAR modules: handwritten C headers and source files
+- AUTOSAR release: Classic R21-11 (AR 4.7.0)
+- Unit test framework: Unity + CMock (host build, `third_party/`)
+- SDK: MCUXpresso SDK 26.09.00 at `../mcuxsdk` (read-only)
 
 # Architecture
 
@@ -28,6 +31,28 @@ Rules:
 - Public module APIs belong in include directories.
 - Every module must have coresponding tests (functional test base on functionality).
 
+# Repository layout
+
+```
+src/platform/        Std_Types.h, Platform_Types.h, Compiler.h
+src/mcal/<Ma>/       MCAL drivers (Mcu, Port, Dio, Gpt, Adc, Pwm, Icu, Wdg)
+src/bsw/services/    Det, EcuM, SchM, ...
+src/bsw/ecual/       IoHwAb, ...
+src/bsw/com/         communication stack (later)
+src/os/              scheduler / OS
+src/rte/             handwritten RTE
+src/app/<Swc>/       transmission control SWCs
+src/ecu/             firmware entry: main.c, EcuM callouts, board port, top-level CMakeLists.txt
+tests/unit/          host unit tests (Unity + CMock), mirrors src/
+tests/target/        on-board functional tests
+docs/                architecture, per-module design notes, compliance matrix, development log
+scripts/operations.py  build / flash / debug / monitor tool (docs/operations.md)
+.claude/             rules, skills, agents, tasks for Claude Code
+```
+
+Every module directory has `include/` (public API), `src/` (implementation) and
+`config/` (handwritten configuration). New modules are created with the `new-module` skill.
+
 # Workflow
 
 For every task:
@@ -42,5 +67,10 @@ For every task:
 9. Update docs/development_log.md.
 10. Report changed files, verification results, and remaining risks.
 
+Use the `module-task` skill to run a task and the `verify` skill for steps 6-8.
+Tasks live in `.claude/tasks/` (`backlog.md`, `TASK_TEMPLATE.md`).
+
 # Coding rules
-Refer the coding rules written in the `claude/rules/coding_rules.md` file.
+The coding rules are in `.claude/rules/coding_rules.md`. Layer-specific rules (`layering.md`,
+`mcal_rules.md`, `app_rules.md`, `testing_rules.md`) are in the same directory and load
+automatically for the paths they cover.

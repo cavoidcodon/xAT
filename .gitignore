@@ -3,3 +3,6 @@ build/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# AUTOSAR specifications (licensed, download locally)
+docs/references/autosar/*.pdf
