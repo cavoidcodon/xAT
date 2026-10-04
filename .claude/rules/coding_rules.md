@@ -1,3 +1,11 @@
+---
+paths:
+  - "src/**/*.c"
+  - "src/**/*.h"
+  - "tests/**/*.c"
+  - "tests/**/*.h"
+---
+
 # C coding rules
 
 Applies to all C code in `src/` and `tests/`. Baseline: **AUTOSAR Classic R21-11

@@ -25,7 +25,9 @@ platform (Std_Types, Platform_Types, Compiler) <- every layer
 
 Additional rules:
 - A layer may only skip a layer through an official AUTOSAR path (`Det`, `SchM`, `Os`).
-  `IoHwAb` is the only BSW module the application reaches, and only through the RTE.
+  The application reaches BSW only through RTE ports, which the RTE maps to `Com` signals
+  today or to `IoHwAb` in a later hardware I/O variant (DC-01 in
+  `docs/specs/system/system_context.md`).
 - Only the integration layer (`src/ecu/`) sees the whole system. Modules must not know
   the board; board facts come from `config/`.
 - Configuration values (pins, channels, timings, calibrations) belong in each module's

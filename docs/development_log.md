@@ -239,3 +239,111 @@ After both runs, `ps` shows no `pyocd gdbserver` or `LinkServer gdbserver` proce
 
 None was requested for this skeleton task. Note that `ops build` fails until TASK-003
 adds `src/ecu/CMakeLists.txt`.
+
+## 2026-10-04: System specification (spec-driven development), first draft
+
+### Summary
+
+- Added `docs/specs/` for spec-driven development: `README.md` (process, ID scheme,
+  status, verification methods), `templates/requirements_template.md`,
+  `system/system_context.md`, `system/safety_goals.md` (SG-01..06),
+  `system/system_requirements.md` (SEL, SFT, ACT, SEN, FLT, COM, TIM, STA, HMI, DIA, BOOT),
+  `system/can_matrix.md`, `system/reprogramming.md`, `simulation/sim_requirements.md`
+  (PLT, GW, CON, TST) and `traceability.md`. Everything is `Draft`; open values are
+  marked `[NC: ...]` or `[NEEDS CLARIFICATION: ...]`.
+- `TASK_TEMPLATE.md`: requirements table has a "Parent (SYS / SWR)" column.
+- `new-module/templates/module_doc.md`: new section "Derived requirements".
+- `docs/architecture/overview.md`: link to `docs/specs/`.
+
+### Decisions (user, 2026-10-03 .. 2026-10-04)
+
+- Spec-kit itself is not installed; its method (specify, clarify, analyze, approval gate)
+  is applied with the existing task and skill structure.
+- No real sensors / actuators: all TCU I/O is exchanged over CAN (500 kbit/s) with a
+  plant model on the Pi5, through an FRDM-MCXN236 acting as a transparent SLCAN gateway.
+  Both boards have an onboard TJA1057 transceiver.
+- 4-speed transmission, selector P/R/N/D, limp-home in 3rd gear; no torque converter
+  lockup and no manual mode in v1.
+- Adc / Pwm / Icu are not needed. Design constraint DC-01 keeps the SWCs independent of
+  the signal source so that hardware I/O can be added later.
+- Firmware update over CAN with UDS: PBL (flash, immutable) + SBL (downloaded to RAM,
+  only part with flash erase / write code); application uses `CanTp` + `Dcm`.
+  v1 security: simple seed / key and CRC32.
+
+### Verification
+
+Documentation only; no build or test run. The user will review the content.
+
+### Remaining risks / open points
+
+- Open questions are listed at the end of `system_requirements.md`, `reprogramming.md`
+  and `sim_requirements.md` (notably the no-init RAM / SBL RAM addresses and whether the
+  MCXN947 boot ROM or SRAM ECC init clears RAM on a software reset).
+- `backlog.md`, `CLAUDE.md` (repository layout for `tools/sim/` and `src/boot/`) and
+  `scripts/operations.py` (second board) are not updated yet; planned as a separate step
+  after the spec review.
+
+## 2026-10-04: Reprogramming robustness (spec update)
+
+### Summary
+
+- The MCXN947 reference manual is not available, so RAM content after reset, boot ROM RAM
+  usage and erased-flash read behaviour are unknown. Findings from the SDK: RAM ECC per
+  bank (`SYSCON->ECC_ENABLE_CTRL`, disabled by `SystemInit()`), reset source in
+  `CMC->SRS` / `SSRS`, flash ECC with bus error on multi-bit errors
+  (`SYSCON->NVM_CTRL`), flash driver provided as ROM API.
+- Decision (user): no board experiment; use a design that does not depend on these
+  unknowns.
+- `system_requirements.md`: SYS-BOOT-003 (validated RAM boot record, only after a
+  software reset), SYS-BOOT-004 (only the SBL calls the ROM flash API), new SYS-BOOT-011
+  (boot window), SYS-BOOT-012 (reset loop detection), SYS-BOOT-013 (fault-free application
+  check).
+- `reprogramming.md` (v0.2): sections 8 (RAM boot record), 9 (PBL start-up decision),
+  10 (robustness rules RB-01..06); later sections renumbered.
+- `traceability.md` and SIM-TST-002 updated.
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).
+
+## 2026-10-04: Simplify the Claude Code structure
+
+### Summary
+
+- `CLAUDE.md`: the architecture section points to `layering.md` instead of repeating the
+  rules; the workflow section points to the `module-task` skill instead of repeating its
+  steps.
+- Task status is held only in `.claude/tasks/backlog.md`: the `Status` row was removed
+  from `TASK_TEMPLATE.md`, `TASK-001.md` and `TASK-003.md`.
+- `TASK_TEMPLATE.md` and `TASK-003.md`: section 0 lists only the task-specific plan
+  contents; the generic planning gate lives in `module-task`.
+- `backlog.md`: TASK-002 row removed (no task file); TASK-003 now depends on TASK-001.
+- `coding_rules.md`: `paths:` frontmatter added, so it loads only for C files in `src/`
+  and `tests/`.
+- One home per trace link: SWS -> code -> test only in `docs/autosar_compliance.md`;
+  SG -> SYS -> SWR / module -> test only in `docs/specs/traceability.md`. The module doc
+  template loses its "Test mapping" section and the "Parent" column of "Derived
+  requirements". `docs/specs/README.md` and the `module-task` log step updated.
+- `CLAUDE.md` brought in line with the 2026-10-04 spec decisions: TCU I/O over CAN with a
+  plant model, Pi5 host, FRDM-MCXN236 gateway, PBL / SBL reprogramming, spec-driven
+  development, DC-01 (RTE maps ports to `Com`), MCAL list without Adc / Pwm / Icu, `Can`
+  and the com stack added.
+- Repository locations decided (user): `src/boot/{pbl,sbl}`, `tools/sim/`,
+  `tools/gateway/`; `sim_requirements.md` open question 1 answered. `CLAUDE.md` has a
+  Language section (English artefacts, Vietnamese replies).
+- `layering.md`: the RTE maps ports to `Com` (today) or `IoHwAb` (hardware variant).
+- `docs/architecture/overview.md`: layer diagram and module list without Adc / Pwm / Icu /
+  IoHwAb, with Can, CanIf, PduR, Com, CanTp, Dcm, PBL / SBL; status column removed (the
+  backlog holds status).
+- `backlog.md` rewritten from TASK-011: gateway + second board, Can stack, sim tools, Rte,
+  SWCs, Wdg, CanTp, Dcm, UDS tester, PBL, SBL, Dem (later).
+- Removed the empty skeleton directories `src/mcal/{Adc,Pwm,Icu}` and
+  `src/bsw/ecual/IoHwAb`.
+- `TASK-001.md`: fixed the path `claude/rules` -> `.claude/rules`.
+- `module-task` step 9: a decision still in force is also written to the file that owns
+  it (`CLAUDE.md`, rules, specs), because the development log is not loaded automatically.
+
+### Verification
+
+Documentation and Claude configuration only; no build or test needed.

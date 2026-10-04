@@ -11,6 +11,14 @@
 
 <!-- Why the transmission ECU needs this module; which HW resources it uses. -->
 
+## Derived requirements
+
+<!-- What the system needs from this module (subset, values), e.g. "Com deadline
+     monitoring 30 ms for SIM_Driver". The link to the parent SYS / SWR requirement and to
+     the tests is kept only in docs/specs/traceability.md section 2. -->
+
+-
+
 ## Supported API
 
 | API | Service ID | Supported | Notes |
@@ -31,7 +39,4 @@
 | SWS requirement | Deviation | Reason |
 |---|---|---|
 
-## Test mapping
-
-| Test | Requirement(s) |
-|---|---|
+SWS requirement -> code -> test: see `docs/autosar_compliance.md`.

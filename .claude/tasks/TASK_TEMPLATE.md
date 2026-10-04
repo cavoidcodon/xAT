@@ -2,7 +2,6 @@
 
 | Field        | Value                                              |
 |--------------|----------------------------------------------------|
-| Status       | TODO                                               |
 | Priority     | P0 / P1 / P2                                       |
 | Depends on   | TASK-YYY                                           |
 | Module(s)    | `<Ma>` (`src/<layer>/<Ma>`)                        |
@@ -10,10 +9,10 @@
 
 ---
 
-## 0. Planning gate (mandatory, do this first)
+## 0. Plan contents (task-specific)
 
-Do **not** create, modify or delete any file until the user has approved a written plan.
-Follow the `module-task` skill (`.claude/skills/module-task/SKILL.md`).
+Run with the `module-task` skill. List here only what the plan must contain in addition to
+the skill's standard plan, or "-".
 
 ## 1. Goal
 
@@ -40,10 +39,11 @@ Follow the `module-task` skill (`.claude/skills/module-task/SKILL.md`).
 
 ## 5. Requirements
 
-<!-- SWS requirement IDs / APIs to implement, plus project-specific requirements. -->
+<!-- SWS requirement IDs / APIs to implement, plus project-specific requirements.
+     Parent: the system / software requirement (docs/specs/) that needs it, or "-". -->
 
-| ID | Requirement |
-|---|---|
+| ID | Requirement | Parent (SYS / SWR) |
+|---|---|---|
 
 ## 6. Acceptance criteria
 

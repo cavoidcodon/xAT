@@ -29,6 +29,10 @@ Follow the workflow in `CLAUDE.md`. Steps:
    changes.
 9. **Log.** Add an entry to `docs/development_log.md` (date, task, summary, decisions,
    deviations, verification table). Update `docs/modules/<Ma>.md`,
-   `docs/autosar_compliance.md` and the task status in `.claude/tasks/backlog.md`.
+   `docs/autosar_compliance.md` (SWS -> code -> test), `docs/specs/traceability.md` §2
+   (only when the task has a SYS / SWR parent) and the task status in `.claude/tasks/backlog.md`.
+   The development log is not loaded automatically: if the task produced a decision that is
+   still in force, also update the file that owns it (`CLAUDE.md`, `.claude/rules/`,
+   `docs/specs/`).
 10. **Report.** Report the changed files, the verification results (with real
     output), and the remaining risks.

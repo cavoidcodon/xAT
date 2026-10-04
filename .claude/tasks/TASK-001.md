@@ -2,7 +2,6 @@
 
 | Field        | Value                                                         |
 |--------------|---------------------------------------------------------------|
-| Status       | TODO                                                          |
 | Priority     | P0 (blocks every later task)                                  |
 | Depends on   | none                                                          |
 | Board / MCU  | FRDM-MCXN947 / MCXN947, core `cm33_core0`                     |
@@ -15,7 +14,7 @@
 
 Do **not** create, modify or delete any file, and do **not** install anything, until the user has approved a written plan.
 
-1. Read this task, `CLAUDE.md` and `claude/rules/coding_rules.md`.
+1. Read this task, `CLAUDE.md` and `.claude/rules/coding_rules.md`.
 2. Investigate with **read-only** actions only (reading files, `ls`, `lsusb`, `which`, `--version` checks, etc.) to resolve the open questions in §8 as far as possible.
 3. Present a plan to the user that contains:
    - the final file list (added / changed), confirming or adjusting §4;
@@ -140,8 +139,8 @@ python3 scripts/operations.py run     # build + flash + monitor --expect (one-sh
 ### 5.4 Smoke-test firmware `src/hello_uart`
 - Initialise the board (`BOARD_InitHardware()` or equivalent from the SDK board layer) and the debug console.
 - Print `xAT hello_uart: boot OK` once, then `xAT tick <n>` about once per second.
-- Keep a global counter `g_tickCount` (named per `claude/rules/coding_rules.md`), so GDB can inspect it.
-- C11, follows `claude/rules/coding_rules.md`.
+- Keep a global counter `g_tickCount` (named per `.claude/rules/coding_rules.md`), so GDB can inspect it.
+- C11, follows `.claude/rules/coding_rules.md`.
 - **Exception to the CLAUDE.md layering rule.** This is a **bring-up program, not AUTOSAR application code**, so it may include NXP SDK headers directly. Document this in its header comment and in the development log.
 
 ## 6. Acceptance criteria
