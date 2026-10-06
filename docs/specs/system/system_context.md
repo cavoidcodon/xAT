@@ -4,7 +4,7 @@
 |----------|--------|
 | Scope    | xAT system (TCU and simulation environment) |
 | Version  | 0.1    |
-| Status   | Draft  |
+| Status   | Approved  |
 
 ## 1. Purpose
 
@@ -101,12 +101,12 @@ open / short circuit faults.
 
 | Parameter | Value | Unit |
 |---|---|---|
-| Ratio 1st / 2nd / 3rd / 4th | [NC: 3.06 / 1.63 / 1.00 / 0.70] | - |
-| Ratio reverse | [NC: 2.29] | - |
-| Final drive ratio | [NC: 3.23] | - |
-| Tyre dynamic radius | [NC: 0.31] | m |
-| Max input shaft speed | [NC: 6500] | rpm |
-| Engine idle speed | [NC: 750] | rpm |
+| Ratio 1st / 2nd / 3rd / 4th | [3.06 / 1.63 / 1.00 / 0.70] | - |
+| Ratio reverse | [2.29] | - |
+| Final drive ratio | [3.23] | - |
+| Tyre dynamic radius | [0.31] | m |
+| Max input shaft speed | [6500] | rpm |
+| Engine idle speed | [750] | rpm |
 
 The TCU keeps these values in SWC `config/`; the plant model keeps its own copy. A
 mismatch shows up as a ratio plausibility fault (`SYS-SEN-005`).
