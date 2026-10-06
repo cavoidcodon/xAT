@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | xAT system |
 | Version  | 0.1   |
-| Status   | Draft |
+| Status   | Approved |
 
 These safety goals give the requirements a structure and a reason. xAT is an educational
 project: there is no hazard analysis and risk assessment (HARA), no ASIL and no claim of
