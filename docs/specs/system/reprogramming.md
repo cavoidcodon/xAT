@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | Application -> PBL -> SBL hand-over, UDS sequence, memory map, image formats |
 | Parent   | `system_requirements.md` (`SYS-DIA`, `SYS-BOOT`) |
-| Version  | 0.3   |
+| Version  | 0.4   |
 | Status   | Approved |
 
 ## 1. Software parts
@@ -29,7 +29,7 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 | 1 | App | `10 03` | `50 03 ...` | extended session |
 | 2 | App | `31 01 02 03` | `71 01 02 03 00` | checkProgrammingPreconditions (`SYS-DIA-004`) |
 | 3 | App | `85 02` | `C5 02` | DTC setting off |
-| 4 | App | `28 03 01` | `68 03` | stop `TCU_Actuators` / `TCU_Status` (`SYS-COM-005`) |
+| 4 | App | `28 01 01` | `68 01` | enableRxAndDisableTx: stop `TCU_Actuators` / `TCU_Status`, reception continues (`SYS-COM-005`) |
 | 5 | App -> PBL | `10 02`, repeated every 5 ms after the first `50 02` | `50 02 ...` (sent by the app), then `50 02 ...` (sent by the PBL) | the app resets (`SYS-BOOT-014`); the PBL answers in the boot window (`SYS-BOOT-011`, section 9) |
 | 6 | PBL | `27 11` / `27 12 <key>` | `67 11 <seed>` / `67 12` | programming security level |
 | 7 | PBL | `34 00 44 0400_0000 <size>` | `74 20 <maxBlockLen>` | download SBL to the SBL load area in SRAMX (section 5) |
@@ -48,13 +48,49 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 
 `3E 80` (tester present, no response) is sent every 2 s during the whole sequence.
 
+**Entry with an invalid application.** When the application is not valid, the PBL runs in
+the default session (`SYS-BOOT-002`) and steps 1 .. 5 do not apply. The tester first reads
+`22 F1 81`: the PBL answers `62 F1 81 FF FF FF FF` (section 4), the application answers its
+version. On `FF FF FF FF` the tester sends `10 02` once; the PBL answers `50 02 ...` without
+a reset and the tester continues at step 6. Added on 2026-10-17 (user, system design
+finding F-07).
+
 ## 3. Sessions and security
 
 | Session | App | PBL | SBL |
 |---|---|---|---|
 | 01 default | yes | yes | - |
-| 02 programming | `10 02` only from 03 (else NRC `7E`) and only if `SYS-DIA-004` holds | yes | yes (always) |
+| 02 programming | `10 02` only from 03 (else NRC `7E`) and only if `SYS-DIA-004` holds | yes, from 01 (no reset) or in the boot window | yes (always) |
 | 03 extended | yes | - | - |
+
+Services per software part and session (`x` = supported; S = needs the security level
+unlocked):
+
+| Service | App 01 | App 03 | PBL 01 | PBL 02 | SBL 02 |
+|---|---|---|---|---|---|
+| `10` DiagnosticSessionControl | 01, 03 | 01, 02, 03 | 01, 02 | 01, 02 | 01, 02 |
+| `11 01` ECUReset | x | x | x | x | x |
+| `14` ClearDiagnosticInformation | x | x | - | - | - |
+| `19 01` / `19 02` ReadDTCInformation | x | x | - | - | - |
+| `22` ReadDataByIdentifier (section 4) | x | x | x | x | x |
+| `27` SecurityAccess | - | 01 / 02 | - | 11 / 12 | - (state handed over) |
+| `28` CommunicationControl | - | x | - | - | - |
+| `2E F1 5A` WriteDataByIdentifier | - | - | - | - | S |
+| `31 01` RoutineControl | - | 0203 | - | 0202, 0301 (S) | 0202, FF00, FF01 (S) |
+| `34` / `36` / `37` download | - | - | - | S | S |
+| `3E` TesterPresent | x | x | x | x | x |
+| `85` ControlDTCSetting | - | x | - | - | - |
+
+- A request that is not supported is answered with the ISO 14229-1 NRC `11`
+  (serviceNotSupported), `12` (subFunctionNotSupported), `7F` / `7E` (service /
+  sub-function not supported in the active session) or `33` (securityAccessDenied).
+- `10 01` in the programming session of the PBL or the SBL: positive response `50 01 ...`,
+  then reset, as for `11 01`; the PBL start-up decision (section 9) then applies.
+- Failed security access, both levels: after 3 failed `27` key attempts, the third one is
+  answered with NRC `36` and every `27` within the next 10 s with NRC `37` (`SYS-BOOT-005`
+  for level 0x11, the same rule for level 0x01).
+
+Added on 2026-10-17 (user, system design findings F-06, F-17).
 
 | Level | `27` sub-functions | Where | Unlocks |
 |---|---|---|---|
@@ -173,7 +209,10 @@ Evaluated once after every reset, in this order:
 | 3 | otherwise | de-initialize CAN and clocks used by the PBL, set VTOR, jump to the application |
 
 The tester's entry procedure: send `10 02` on 0x7E1 every 5 ms until the PBL answers
-`50 02`. Normal entry: start after the application's `50 02` (`SYS-BOOT-014`). Recovery
+`50 02`. The application does not respond between its own `50 02` and its reset
+(`SYS-BOOT-014`), so the next `50 02` is the PBL's. When the PBL already runs in the default
+session (invalid application), a single `10 02` is enough (section 2, entry with an invalid
+application). Normal entry: start after the application's `50 02` (`SYS-BOOT-014`). Recovery
 (used by `SIM-TST-002`): start, then reset the ECU (power cycle, or `11 01` if the
 application still answers).
 
@@ -198,6 +237,27 @@ application still answers).
 | 0xFF00 | eraseMemory | SBL | `44`, address (4), size (4); sector-aligned | 0 = OK, 1 = failed |
 | 0xFF01 | checkProgrammingDependencies | SBL | - | 0 = OK, 1 = header invalid, 2 = hw_id mismatch, 3 = PBL version too old |
 
+`min_pbl_version` and the PBL version (DID 0xF180) are compared as
+major << 16 | minor << 8 | patch. After a CRC mismatch of the application at `0202` or a
+failed `FF01`, the SBL erases the sector that holds the application header before it
+responds (`SYS-BOOT-015`).
+
+### 11.1 Request sequence and address rules
+
+| Request | Refused when | NRC |
+|---|---|---|
+| `34` in the PBL | the range start .. start + size - 1 is not inside the SBL load area 0x0400_0000 .. 0x0400_FFFF | `31` |
+| `34`, `31 01 FF 00` in the SBL | the range is not inside the application area (0x0001_4000 .. 0x000F_FFFF) or the boot info area (0x0001_0000 .. 0x0001_3FFF); eraseMemory also when not sector-aligned | `31` (`SYS-BOOT-006`) |
+| `36` | no download accepted by `34`, or the transfer is already complete | `24` |
+| `36` | wrong block sequence counter | `73` |
+| `37` | no download accepted by `34` | `24` |
+| `31 01 02 02` | no download completed with `37` since the last `34` | `24` |
+| `31 01 03 01` | the last `31 01 02 02` of the SBL did not return 0 (OK) | `24` |
+| `31 01 03 01` | the SBL image header is invalid (magic `0x53544178` "xATS", `header_crc32`) | `22` |
+| `31 01 FF 01` | the last `31 01 02 02` of the application did not return 0 (OK) | `24` |
+
+Added on 2026-10-17 (user, system design finding F-05).
+
 ## 12. Transfer parameters and timing
 
 | Parameter | Value |
@@ -218,3 +278,4 @@ application still answers).
 | 2 | PBL size 64 KiB enough? (CAN + ISO-TP + UDS + CRC, no flash driver) | section 5 | Yes. Measured 2026-10-17 (GCC 15.2, `-Os`, `--gc-sections`, newlib-nano): startup, vector table, SDK FlexCAN, clock, reset and CRC drivers with a minimal CAN echo loop = 7.2 KiB flash, 3 KiB RAM (2 KiB stack, 1 KiB heap). Estimated additions: ISO-TP 3 - 4 KiB, UDS server (`10`, `11`, `22`, `27`, `31`, `34` / `36` / `37`, `3E`, NRCs, P2 / S3) 6 - 8 KiB, application check with fault recovery (RB-02) 1 - 2 KiB, boot window, timer, seed / key, DIDs 1 - 2 KiB: about 20 - 25 KiB for a lean PBL, about 35 - 40 KiB if the AUTOSAR stack modules (CanIf, PduR, CanTp, Dcm, Det) are reused with their configuration tables. 64 KiB is kept; to be confirmed with the map file of the first PBL build. Closed. |
 | 3 | Seed source: TRNG or timer-based? | section 3 | Timer-based (section 3). Closed (user, 2026-10-17). |
 | 4 | Use the MCXN947 CRC engine or a software table CRC in the PBL? (start-up time `SYS-STA-001`) | SYS-BOOT-001 | CRC engine (`CRC0`, SDK driver `fsl_crc`): the polynomial, seed, input / output reflection and final complement are programmable, so it computes CRC-32/ISO-HDLC (poly 0x04C11DB7, seed 0xFFFF_FFFF, reflect in / out, complement). Used in the PBL and the SBL; the result must match `zlib.crc32` of the tester (unit test against a known vector). Closed (user, 2026-10-17). |
+| 5 | System design findings F-01, F-04 .. F-08, F-17 (TASK-026 plan): sub-function of `28`, rejected images, sequence and address rules, services per session, entry with an invalid application, application `50 02` vs. PBL `50 02`, security lockout of level 0x01 | sections 2, 3, 9, 11 | Step 4 is `28 01 01`; section 2 entry with an invalid application; section 3 services table; section 11 header invalidation and 11.1 sequence rules. Closed (user, 2026-10-17). |

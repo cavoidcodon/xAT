@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | CAN bus between the TCU and the plant model (via the gateway) |
 | Parent   | `system_requirements.md` (`SYS-COM`, `SYS-DIA`) |
-| Version  | 1.1   |
+| Version  | 1.2   |
 | Status   | Approved |
 
 This document is the **single source** for CAN identifiers, layouts and scaling
@@ -142,7 +142,7 @@ range limit the value is clamped.
 | Parameter | Value |
 |---|---|
 | Physical request | 0x7E1 |
-| Functional request | 0x7DF (single frame only) |
+| Functional request | 0x7DF (single frame only); used by the tester only for `3E 80`, every other request is physical (0x7E1) |
 | Response | 0x7E9 |
 | ISO-TP addressing | normal, DLC always 8 |
 | Padding byte | 0xCC |
@@ -156,6 +156,13 @@ The same identifiers and parameters are used by the application, the PBL and the
 
 | Message | On timeout (`SYS-COM-002`) |
 |---|---|
-| `SIM_Driver` | Selector = invalid (-> `SYS-SEL-002`), Brake = released, Throttle = 0 %; communication fault -> limp-home |
-| `SIM_Speed` | both speeds invalid; communication fault -> limp-home |
-| `SIM_Analog` | oil temperature substitute value (`SYS-FLT-005`); line pressure not available, pressure plausibility suspended; communication fault, no limp-home |
+| `SIM_Driver` | Selector = invalid (-> `SYS-SEL-002`), Brake = released, Throttle = 0 %; communication fault (bit 7) -> limp-home |
+| `SIM_Speed` | both speeds invalid; communication fault (bit 8) -> limp-home; the shaft speed invalid fault (bit 6) is not set |
+| `SIM_Analog` | oil temperature substitute value 80 degC (`SYS-FLT-005`); line pressure not available, pressure plausibility suspended; communication fault (bit 9) -> limp-home (fault lamp ON); the sensor faults (bits 4, 5) are not set |
+
+The substitute values also apply from the start of the application until the first reception
+of the message (`SYS-COM-002`).
+
+Changed on 2026-10-17 (user, system design findings F-12, F-14, F-16): fault bits per
+timeout named; a `SIM_Analog` timeout now enters limp-home like a line pressure sensor fault
+(`SYS-FLT-002`); functional addressing only for `3E 80`.

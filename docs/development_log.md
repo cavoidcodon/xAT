@@ -373,3 +373,58 @@ Findings from preparing TASK-026 (system design), resolved with the user:
 
 Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
 with a grep script).
+
+## 2026-10-17: Spec findings from the system design (F-01 .. F-18, spec update)
+
+### Summary
+
+Findings from planning TASK-026, resolved with the user before any diagram is written
+(decision: fix the specs first). Proposals of the approved TASK-026 plan applied:
+
+- `system_requirements.md` (v0.3):
+  - SYS-COM-005 (F-01): stop with `28 01 01`, restart with `28 00 01`; reception continues.
+  - SYS-SEL-005, SYS-SFT-007, SYS-SEN-005, term "shift in progress" (F-02, F-03): shifts and
+    shift / ratio monitoring only in D; in P / R / N the prepared pattern follows directly
+    (only `SYS-SFT-005` applies); a shift is complete at OutputShaftSpeed <= 200 rpm.
+  - SYS-BOOT-001 (F-04): the start check also covers `hw_id` and `min_pbl_version`; new
+    SYS-BOOT-015: the SBL erases the application header sector after a failed `0202` /
+    `FF01`.
+  - SYS-BOOT-006 (F-05): eraseMemory named. SYS-BOOT-014 (F-08): the application is silent
+    between its `50 02` and the reset.
+  - SYS-SEL-001, SYS-COM-002, SYS-STA-001 (F-09): selector N until the first accepted
+    position; timeouts monitored from the application start with substitute values until the
+    first reception; control active within 500 ms also without plant messages.
+  - SYS-FLT-003, SYS-COM-006 (F-10): bus-off: red LED ON within 100 ms, limp-home outputs when
+    the bus is back, recovery continues.
+  - New SYS-FLT-008 (F-11): limp-home faults stay set until the power cycle (selector fault:
+    own rule); oil temperature sensor fault and overtemperature recover. SYS-SEN-002: set on
+    the first invalid value.
+  - SYS-SEL-004 (F-13): RLS stays ON only while R remains selected and the speed is valid.
+  - SYS-FLT-002 (F-14): communication fault of `SIM_Analog` enters limp-home.
+  - SYS-STA-002 note (F-15): no watchdog in the PBL / SBL in v1. SYS-COM-004 note (F-18): no
+    `TCU_Status` before control active. Open question 9 added and closed.
+- `can_matrix.md` (v1.2): section 5 functional addressing only for `3E 80` (F-16); section 6
+  fault bits per timeout, `SIM_Analog` timeout -> limp-home, substitute values until the first
+  reception (F-12, F-14).
+- `reprogramming.md` (v0.4): step 4 `28 01 01` / `68 01`; entry with an invalid application
+  (F-07); section 3 services per part and session, `10 01` in a bootloader programming
+  session resets, lockout rule for level 0x01 (F-06, F-17); section 9 entry note; section 11
+  version comparison and header invalidation, new 11.1 request sequence and address rules
+  (F-05). Open question 5 added and closed.
+- `system_context.md` (v0.2): mode "Programming" renamed "Bootloader" (PBL start-up, default
+  and programming sessions, SBL); Init sends no `TCU_Status` (F-18).
+- `traceability.md` (v0.3): SYS-FLT-008 under SG-04, SYS-BOOT-015 under SG-06 and SIM-TST-002.
+- `TASK-026.md` section 2: pointer to this update.
+
+### Decisions
+
+- F-14: the stricter option was taken (a `SIM_Analog` timeout enters limp-home like a line
+  pressure sensor fault); consequently the `SIM_Analog` communication fault is latched by
+  SYS-FLT-008 and is not in its list of recovering faults.
+- F-06: `10 01` in a PBL / SBL programming session answers `50 01` and resets (the plan named
+  `10 01` as supported without stating its effect).
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).

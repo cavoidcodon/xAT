@@ -61,6 +61,11 @@ tasks, APIs - is designed later in `module-design` and `swc-design` and must not
   - `docs/specs/simulation/sim_requirements.md` - plant model, gateway, console, tester
     (`SIM-PLT/GW/CON/TST`);
   - `docs/specs/traceability.md` - SG -> SYS.
+- **Spec update 2026-10-17 (findings F-01 .. F-18 of the plan, see `docs/development_log.md`):**
+  system_requirements 0.3 (new SYS-FLT-008, SYS-BOOT-015), can_matrix 1.2, reprogramming
+  0.4, system_context 0.2 (mode "Programming" renamed "Bootloader"), traceability 0.3. Where
+  section 5.2 below differs (e.g. `SIM_Analog` timeout now enters limp-home), the specs and
+  the approved plan apply.
 - **Existing architecture docs:** `docs/architecture/overview.md` (layers and module list -
   software view; it gets a link to the system design, nothing else). `docs/modules/` is
   empty.
