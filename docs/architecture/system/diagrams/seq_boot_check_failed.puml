@@ -30,7 +30,7 @@ alt SBL image: CRC mismatch at checkMemory in the PBL (step 10)
   note over PBL: the application in flash is unchanged: after the next reset the PBL\nstarts it if it is valid (SYS-BOOT-001), otherwise stays in the default session
 else application image: CRC mismatch at checkMemory in the SBL (step 17)
   Tester -> SBL : 31 01 02 02 <crc32>
-  SBL -> SBL : CRC mismatch -> erase the flash sector that holds the application\nheader (0x0001_4000) before the response (SYS-BOOT-015)
+  SBL -> SBL : CRC mismatch -> the flash sector that holds the application header\n(0x0001_4000 .. 0x0001_5FFF) is not programmed, it stays erased (SYS-BOOT-015)
   SBL --> Tester : 71 01 02 02 01
   Tester -> SBL : 31 01 FF 01
   SBL --> Tester : 7F 31 24
@@ -38,7 +38,7 @@ else application image: CRC mismatch at checkMemory in the SBL (step 17)
   Tester -> Tester : stop with a clear message (SIM-TST-001)
 else checkProgrammingDependencies fails (step 18)
   Tester -> SBL : 31 01 FF 01
-  SBL -> SBL : header invalid / hw_id not 0x0947_0001 / min_pbl_version > PBL version\n-> erase the sector that holds the application header (SYS-BOOT-015)
+  SBL -> SBL : header invalid / hw_id not 0x0947_0001 / min_pbl_version > PBL version\n-> the application header sector is not programmed, it stays erased (SYS-BOOT-015)
   SBL --> Tester : 71 01 FF 01 01 | 02 | 03
   note right: 1 header invalid, 2 hw_id mismatch,\n3 PBL version too old (reprogramming section 11)
   Tester -> Tester : stop with a clear message (SIM-TST-001)
@@ -48,7 +48,7 @@ end
 Tester -> SBL : 11 01
 SBL --> Tester : 51 01
 note over PBL, SBL: reset: the SBL in RAM is discarded
-PBL -> PBL : application check fails (header sector erased), without a processor fault\n(SYS-BOOT-001, SYS-BOOT-013)
+PBL -> PBL : application check fails (header sector still erased), without a processor fault\n(SYS-BOOT-001, SYS-BOOT-013)
 PBL -> PBL : stay in the bootloader, default session, no time limit (SYS-BOOT-002)
 note over PBL: no TCU_Actuators / TCU_Status (SYS-BOOT-008)
 Plant -> Plant : no TCU_Actuators for 50 ms: hydraulic default (SIM-PLT-004)

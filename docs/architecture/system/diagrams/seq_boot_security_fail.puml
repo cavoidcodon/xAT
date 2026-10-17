@@ -49,5 +49,5 @@ Tester -> PBL : 27 12 <key = rotl32(seed, 7) XOR 0x5A3C_C3A5>
 PBL --> Tester : 67 12
 note right of PBL: level 0x11 unlocked; programming continues at step 7 (SC-BOOT-01)
 
-note over Tester, PBL: Whether the failed-attempt counter and the delay survive a reset is not stated (open question N-09 in system_design.md).
+note over Tester, PBL: The failed-attempt counter and the delay are not kept across a reset; a reset gives 3 new attempts (reprogramming section 3, accepted for v1).
 @enduml

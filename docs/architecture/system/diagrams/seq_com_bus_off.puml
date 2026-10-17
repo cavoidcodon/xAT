@@ -39,7 +39,7 @@ alt bus back within 30 ms
 else bus not back within 30 ms
   TCU -> TCU : t0 + 30 ms: no SIM_Driver, SIM_Speed, SIM_Analog -> communication faults\n(FaultBits 7, 8, 9) (SYS-COM-002) -> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
   TCU -> LED : ON (SYS-HMI-001)
-  note right of TCU: the limp-home outputs cannot be transmitted\nwithin 100 ms during bus-off\n(open question N-06 in system_design.md)
+  note right of TCU: fault set while in bus-off: red LED ON within 100 ms,\nlimp-home outputs as soon as the bus is back (SYS-FLT-003)
   ... 50 ms without TCU_Actuators ...
   Plant -> Plant : t0 + 50 ms: hydraulic default (SIM-PLT-004):\nsame gear (3rd in D) and pressure as limp-home (SYS-FLT-003 note)
   alt bus back within 1000 ms

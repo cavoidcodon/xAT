@@ -25,7 +25,7 @@ alt vehicle at standstill (< 2 km/h), selector P, R or N
 else rolling in N above standstill
   Plant -> TCU : SIM_Driver: Selector = 2 (N), Throttle; SIM_Speed: OutputShaftSpeed
   TCU -> TCU : gear from the shift schedule (vehicle speed, throttle),\nonly a gear with OutputShaftSpeed x ratio <= 6000 rpm (SYS-SFT-005)
-  note right of TCU: example from SYS-SFT-005: at 100 km/h\n1st would give about 8460 rpm,\nso no gear below 2nd is prepared;\nopen question N-11 in system_design.md
+  note right of TCU: example from SYS-SFT-005: at 100 km/h\n1st would give about 8460 rpm,\nso no gear below 2nd is prepared;\nthe lowest higher gear within the limit (SYS-SFT-006)
   TCU -> Plant : TCU_Actuators: SS_A / SS_B of the prepared gear (SYS-ACT-001)
   TCU -> Plant : TCU_Status: SelectorState = 2 (N), ShiftInProgress = 0
   Plant -> Plant : N: no gear engaged (SIM-PLT-002)

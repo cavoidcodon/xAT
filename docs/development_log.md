@@ -564,3 +564,42 @@ the TASK-026 diagrams, resolved with the user:
 Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
 with a grep script).
 
+## 2026-10-17: TASK-026 system design updated for N-01 .. N-11
+
+### Summary
+
+The system design follows the spec update of N-01 .. N-11 (commit `0fcaba6`):
+
+- `system_design.md` 0.2: input versions (system_requirements 0.4, can_matrix 1.3,
+  reprogramming 0.5); section 10.2 lists N-01 .. N-11 as resolved with the decision and the
+  spec location; assumption A-01 removed (section 10.3: none).
+- Diagrams updated (15):
+  - SC-SEL-02: lamp / red LED ON while the selector fault is set, `SelectorState` = 7.
+  - SC-FLT-03, SC-COM-01: `OilTemp` = 0xFF while the substitute is used.
+  - SC-FLT-04: pressure plausibility suspended with the line pressure sensor fault.
+  - SC-COM-02: counter reference = last received message.
+  - SC-COM-04: SYS-FLT-003 exception for faults set in bus-off.
+  - SC-SFT-07: start-up instant from SYS-SFT-008 (no assumption left).
+  - SC-DIA-01: `10 01` undoes `28` / `85`.
+  - SC-BOOT-02: lockout not kept across a reset.
+  - SC-BOOT-01, SC-BOOT-03, SC-BOOT-05, `cmp_tcu_software_parts`: application header sector
+    programmed last (SYS-BOOT-015); SC-BOOT-05 now has the branches before the erase,
+    steps 13 .. 18 and step 19.
+  - SC-SFT-02, SC-SEL-05: lowest higher gear within the 6000 rpm limit.
+
+### Deviations
+
+- While updating SC-BOOT-05, the new SYS-BOOT-007 wording was found to miss the interruption in
+  step 19 (application already accepted). Fixed in the spec commit before it was used
+  (amended into `0fcaba6`; development log entry of the N-01 .. N-11 spec update adjusted).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc = 0 |
+| Render of the 15 changed diagrams to the scratchpad | rc = 0; SC-BOOT-05, SC-SEL-02 and SC-COM-02 (largest changes) viewed, layout correct |
+| AC2 script (coverage, IDs, catalogue, SG, SIM) | `AC2 PASSED`; no open question or `ASSUMPTION` referenced in the diagrams |
+| AC3 grep for software-design names | no match (rc = 1) |
+| `git diff --stat 0fcaba6 -- docs/specs src` | empty |
+

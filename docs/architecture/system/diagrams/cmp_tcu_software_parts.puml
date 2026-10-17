@@ -34,7 +34,7 @@ App ..> FlashBi : reads (DIDs)
 App ..> SysRam : uses
 
 SBL ..> Sramx : runs only from RAM (RB-04)
-SBL --> FlashHdr : erase / write (SYS-BOOT-004); erases the header\nsector after a failed 0202 / FF01 (SYS-BOOT-015)
+SBL --> FlashHdr : erase / write (SYS-BOOT-004); writes the header\nsector last, after 0202 / FF01 passed (SYS-BOOT-015)
 SBL --> FlashImg : erase / write (SYS-BOOT-004)
 SBL --> FlashBi : writes the slot that is not the newest
 SBL ..> FlashPbl : erase / write refused, NRC 31 (SYS-BOOT-006)

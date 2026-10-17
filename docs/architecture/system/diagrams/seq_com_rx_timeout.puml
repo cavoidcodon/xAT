@@ -40,7 +40,7 @@ end
 TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
 note right of TCU: <= 100 ms after the communication fault is set (SYS-FLT-003)
 TCU -> LED : ON (SYS-HMI-001)
-TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 7, 8 or 9 = 1
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 7, 8 or 9 = 1;\nSIM_Driver: SelectorState = 7; SIM_Analog: OilTemp = 0xFF (can_matrix section 3.5)
 note over Plant, TCU: Safe state of SG-04: limp-home.
 
 User -> Console : restart the message

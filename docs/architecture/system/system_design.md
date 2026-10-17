@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | xAT system architecture: system elements, interfaces, requirement allocation, scenarios |
 | Task     | TASK-026 |
-| Version  | 0.1   |
+| Version  | 0.2   |
 | Status   | Draft (for review) |
 
 ## 1. Purpose
@@ -29,15 +29,15 @@ The scenario catalogue (section 8) is the base for the target tests (`TT`).
 
 ## 2. Inputs
 
-All inputs are `Approved`. The baseline is commit `79929ee` (spec findings F-01 .. F-18 resolved, section 10.1).
+All inputs are `Approved`. The baseline is commit `0fcaba6` (spec findings F-01 .. F-18 resolved by `79929ee`, section 10.1; N-01 .. N-11 by `0fcaba6`, section 10.2).
 
 | Document | Version | Content used |
 |---|---|---|
 | [`system_context.md`](../../specs/system/system_context.md) | 0.2 | nodes, logical signals, transmission model, operating modes (section 5), DC-01 .. DC-05 |
-| [`system_requirements.md`](../../specs/system/system_requirements.md) | 0.3 | 61 `Approved` SYS requirements; SYS-BOOT-003 and SYS-BOOT-012 are `Deleted` and are not designed |
+| [`system_requirements.md`](../../specs/system/system_requirements.md) | 0.4 | 61 `Approved` SYS requirements; SYS-BOOT-003 and SYS-BOOT-012 are `Deleted` and are not designed |
 | [`safety_goals.md`](../../specs/system/safety_goals.md) | 0.1 | SG-01 .. SG-06 and their safe states |
-| [`can_matrix.md`](../../specs/system/can_matrix.md) | 1.2 | CAN IDs, signals, fault bits and DTCs, sensor characteristics, diagnostic IDs, timeouts and substitute values |
-| [`reprogramming.md`](../../specs/system/reprogramming.md) | 0.4 | software parts, programming sequence, services per session, DIDs, memory map, image header, boot info, start-up decision, RB-01 .. RB-06, routines, request sequence rules, timing |
+| [`can_matrix.md`](../../specs/system/can_matrix.md) | 1.3 | CAN IDs, signals, fault bits and DTCs, sensor characteristics, diagnostic IDs, timeouts and substitute values |
+| [`reprogramming.md`](../../specs/system/reprogramming.md) | 0.5 | software parts, programming sequence, services per session, DIDs, memory map, image header, boot info, start-up decision, RB-01 .. RB-06, routines, request sequence rules, timing |
 | [`sim_requirements.md`](../../specs/simulation/sim_requirements.md) | 0.2 | plant model, gateway, console, tester (18 SIM requirements) |
 | [`traceability.md`](../../specs/traceability.md) | 0.3 | SG -> SYS |
 
@@ -245,7 +245,7 @@ SYS-BOOT-003 and SYS-BOOT-012 are `Deleted` and are not allocated.
 | SYS-BOOT-011 | Boot window | E-02 PBL |  |
 | SYS-BOOT-013 | Fault-free application check | E-02 PBL |  |
 | SYS-BOOT-014 | Programming entry from the application | E-04 application |  |
-| SYS-BOOT-015 | Rejected application | E-03 SBL |  |
+| SYS-BOOT-015 | Application header written last | E-03 SBL |  |
 
 ### 7.2 Simulation requirements
 
@@ -296,7 +296,7 @@ they are named in the *Variants* column. *Covers* lists the IDs of the diagram's
 | SC-FLT-01 | Limp-home entry (any fault of SYS-FLT-002) | [`seq_flt_limp_home_entry.puml`](diagrams/seq_flt_limp_home_entry.puml) | group: interlocks in limp-home; fault disappears; power cycle | SYS-FLT-001, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-HMI-001, SYS-SEL-003, SYS-SEL-004, SYS-SFT-004, SYS-SFT-005, SIM-PLT-002, SIM-PLT-007, SG-04 |
 | SC-FLT-02 | Shaft speed above 8000 rpm: invalid, limp-home, reverse locked out | [`seq_flt_shaft_speed_invalid.puml`](diagrams/seq_flt_shaft_speed_invalid.puml) | opt: R selected with RLS = ON | SYS-SEN-002, SYS-SEN-001, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-SEL-004, SYS-HMI-001, SIM-CON-003, SG-01, SG-04 |
 | SC-FLT-03 | Oil temperature sensor out of range: substitute 80 degC, mode Normal | [`seq_flt_oil_temp_sensor.puml`](diagrams/seq_flt_oil_temp_sensor.puml) | fault set after 100 ms, cleared after 100 ms in range | SYS-SEN-003, SYS-SEN-004, SYS-FLT-005, SYS-FLT-008, SYS-HMI-001, SIM-CON-003, SG-04 |
-| SC-FLT-04 | Line pressure sensor out of range: limp-home | [`seq_flt_line_pressure_sensor.puml`](diagrams/seq_flt_line_pressure_sensor.puml) | - | SYS-SEN-004, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-04 |
+| SC-FLT-04 | Line pressure sensor out of range: limp-home | [`seq_flt_line_pressure_sensor.puml`](diagrams/seq_flt_line_pressure_sensor.puml) | - | SYS-SEN-004, SYS-SEN-006, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-04 |
 | SC-FLT-05 | Gear ratio plausibility: ratio fault, limp-home | [`seq_flt_ratio_plausibility.puml`](diagrams/seq_flt_ratio_plausibility.puml) | alt: input shaft speed offset / solenoid stuck; opt: no check outside D, during a shift or <= 200 rpm | SYS-SEN-005, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-04 |
 | SC-FLT-06 | Line pressure plausibility: pressure fault, limp-home | [`seq_flt_pressure_plausibility.puml`](diagrams/seq_flt_pressure_plausibility.puml) | - | SYS-SEN-006, SYS-SEN-003, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-PLT-007, SIM-CON-003, SG-04 |
 | SC-FLT-07 | Oil overtemperature: fault lamp only | [`seq_flt_oil_overtemp.puml`](diagrams/seq_flt_oil_overtemp.puml) | alt: warm-up while driving / forced sensor voltage; cleared at <= 130 degC | SYS-FLT-006, SYS-FLT-008, SYS-HMI-001, SYS-SEN-003, SIM-PLT-007, SIM-CON-003 |
@@ -309,11 +309,11 @@ they are named in the *Variants* column. *Covers* lists the IDs of the diagram's
 | SC-DIA-02 | Read identification DIDs in the application, PBL and SBL | [`seq_dia_read_dids.puml`](diagrams/seq_dia_read_dids.puml) | group: application / PBL / SBL | SYS-DIA-005, SYS-DIA-001, SYS-DIA-002, SIM-TST-003 |
 | SC-DIA-03 | Security access level 0x01 and ECU reset (application) | [`seq_dia_security_reset.puml`](diagrams/seq_dia_security_reset.puml) | `27` in the default session refused; alt: correct key (opt: seed 0 when unlocked) / wrong key, lockout; `11 01` | SYS-DIA-002, SYS-STA-001, SYS-ACT-004, SYS-FLT-004, SYS-FLT-007, SIM-PLT-004 |
 | SC-DIA-04 | Programming session refused by the application | [`seq_dia_programming_refused.puml`](diagrams/seq_dia_programming_refused.puml) | `10 02` from the default session (`7E`); alt: moving / not P / speed invalid (`22`) | SYS-DIA-004, SYS-DIA-002, SIM-TST-002, SIM-TST-004, SG-05 |
-| SC-BOOT-01 | Nominal programming, steps 1 .. 19 | [`seq_boot_programming.puml`](diagrams/seq_boot_programming.puml) | three pages: application and hand-over (steps 1 .. 5), PBL (6 .. 11), SBL and restart (12 .. 19); `loop` for `36`; `7F 31 78` | SYS-BOOT-001, SYS-BOOT-004, SYS-BOOT-005, SYS-BOOT-006, SYS-BOOT-008, SYS-BOOT-010, SYS-BOOT-011, SYS-BOOT-014, SYS-DIA-001, SYS-DIA-002, SYS-DIA-004, SYS-DIA-005, SYS-COM-005, SYS-STA-001, SIM-TST-001, SIM-TST-004, SIM-GW-002, SIM-PLT-004 |
+| SC-BOOT-01 | Nominal programming, steps 1 .. 19 | [`seq_boot_programming.puml`](diagrams/seq_boot_programming.puml) | three pages: application and hand-over (steps 1 .. 5), PBL (6 .. 11), SBL and restart (12 .. 19); `loop` for `36`; `7F 31 78` | SYS-BOOT-001, SYS-BOOT-004, SYS-BOOT-005, SYS-BOOT-006, SYS-BOOT-008, SYS-BOOT-010, SYS-BOOT-011, SYS-BOOT-015, SYS-BOOT-014, SYS-DIA-001, SYS-DIA-002, SYS-DIA-004, SYS-DIA-005, SYS-COM-005, SYS-STA-001, SIM-TST-001, SIM-TST-004, SIM-GW-002, SIM-PLT-004 |
 | SC-BOOT-02 | Security access failures in the PBL | [`seq_boot_security_fail.puml`](diagrams/seq_boot_security_fail.puml) | download without security (`33`); wrong key (`35`), third failure (`36`), lockout 10 s (`37`) | SYS-BOOT-005, SYS-BOOT-009, SYS-DIA-001, SIM-TST-002 |
 | SC-BOOT-03 | checkMemory or checkProgrammingDependencies failed | [`seq_boot_check_failed.puml`](diagrams/seq_boot_check_failed.puml) | alt: SBL CRC mismatch (opt: invalid SBL header) / application CRC mismatch / `FF01` failed; next reset ends in the PBL default session | SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SYS-BOOT-013, SYS-BOOT-015, SIM-TST-001, SIM-TST-002, SIM-PLT-004, SG-06 |
 | SC-BOOT-04 | Address and request sequence errors refused (PBL protection) | [`seq_boot_address_refused.puml`](diagrams/seq_boot_address_refused.puml) | group: PBL `34` outside the SBL load area / SBL `34` and eraseMemory outside the allowed areas / request sequence errors | SYS-BOOT-006, SYS-BOOT-004, SIM-TST-002, SG-06 |
-| SC-BOOT-05 | Programming interrupted, then recovered | [`seq_boot_interrupted.puml`](diagrams/seq_boot_interrupted.puml) | alt: reset or power loss / tester stops; alt: interrupted in steps 5 .. 12 / after step 16 / in steps 13 .. 16 with recovery from the PBL default session | SYS-BOOT-007, SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SYS-BOOT-009, SYS-BOOT-013, SYS-DIA-005, SIM-TST-002, SIM-PLT-004, SG-06 |
+| SC-BOOT-05 | Programming interrupted, then recovered | [`seq_boot_interrupted.puml`](diagrams/seq_boot_interrupted.puml) | alt: reset or power loss / tester stops; alt: interrupted in steps 5 .. 12 / after step 16 / in steps 13 .. 16 with recovery from the PBL default session | SYS-BOOT-007, SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SYS-BOOT-009, SYS-BOOT-013, SYS-BOOT-015, SYS-DIA-005, SIM-TST-002, SIM-PLT-004, SG-06 |
 | SC-BOOT-06 | Session timeout in the bootloader programming session | [`seq_boot_session_timeout.puml`](diagrams/seq_boot_session_timeout.puml) | alt: PBL / SBL programming session; alt: application valid / invalid | SYS-BOOT-009, SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SIM-PLT-004 |
 | SC-BOOT-07 | Recovery through the boot window | [`seq_boot_window_recovery.puml`](diagrams/seq_boot_window_recovery.puml) | alt: `11 01` / power cycle; opt: application resets in a loop | SYS-BOOT-011, SYS-BOOT-001, SYS-BOOT-005, SYS-BOOT-008, SIM-TST-002 |
 | cmp_system_context | System context - physical view (elements E-01 .. E-15) | [`cmp_system_context.puml`](diagrams/cmp_system_context.puml) | physical view, E-01 .. E-15 | SYS-COM-001, SYS-HMI-001, SYS-HMI-002, SYS-BOOT-006, SIM-GW-001, SIM-GW-002, SIM-GW-003, SIM-CON-001, SIM-CON-002, SIM-CON-003, SIM-CON-004, SIM-TST-001, SIM-TST-004 |
@@ -332,9 +332,9 @@ Notes:
   - SC-SFT-07: refused downshift 4 -> 3;
   - SC-BOOT-05: recovery from the PBL default session.
 - Variants that follow from the spec text:
-  - SC-COM-04 also shows the 30 ms reception timeouts during a bus-off (N-06).
-  - SC-BOOT-05 separates the interruption before the erase, during erase / download, and after a
-    complete download (N-10).
+  - SC-COM-04 also shows the 30 ms reception timeouts during a bus-off (SYS-FLT-003, N-06).
+  - SC-BOOT-05 separates the interruption before the erase, in steps 13 .. 18 (header sector still
+    erased) and in step 19 (application accepted) (SYS-BOOT-007, SYS-BOOT-015, N-10).
 
 ## 9. Coverage
 
@@ -367,7 +367,7 @@ Diagrams are listed by scenario ID; `cmp_*` and `stm_*` are the component and st
 | SYS-SEN-003 | Analog sensor conversion | SC-SFT-07, SC-FLT-03, SC-FLT-06, SC-FLT-07 | conversion accuracy: UT |
 | SYS-SEN-004 | Analog sensor range check | SC-FLT-03, SC-FLT-04 |  |
 | SYS-SEN-005 | Gear ratio plausibility | SC-SFT-03, SC-FLT-05 |  |
-| SYS-SEN-006 | Line pressure plausibility | SC-FLT-06, SC-COM-01 |  |
+| SYS-SEN-006 | Line pressure plausibility | SC-FLT-04, SC-FLT-06, SC-COM-01 |  |
 | SYS-FLT-001 | Limp-home behaviour | SC-STA-01, SC-SEL-02, SC-SEL-03, SC-SEL-04, SC-SFT-06, SC-FLT-01, SC-FLT-04, SC-FLT-05, SC-FLT-06, SC-COM-01, SC-COM-04, stm_tcu_modes |  |
 | SYS-FLT-002 | Limp-home entry | SC-STA-01, SC-SEL-02, SC-SFT-06, SC-FLT-01, SC-FLT-02, SC-FLT-04, SC-FLT-05, SC-FLT-06, SC-COM-01, SC-COM-02, SC-COM-04, stm_tcu_modes |  |
 | SYS-FLT-003 | Fault reaction time | SC-SEL-02, SC-SFT-06, SC-FLT-01, SC-FLT-02, SC-FLT-04, SC-FLT-05, SC-FLT-06, SC-COM-01, SC-COM-04, stm_tcu_modes |  |
@@ -405,7 +405,7 @@ Diagrams are listed by scenario ID; `cmp_*` and `stm_*` are the component and st
 | SYS-BOOT-011 | Boot window | SC-STA-01, SC-BOOT-01, SC-BOOT-07, stm_tcu_modes |  |
 | SYS-BOOT-013 | Fault-free application check | SC-STA-01, SC-STA-02, SC-BOOT-03, SC-BOOT-05, cmp_tcu_software_parts, stm_tcu_modes | TT power loss during `36`; UT of the check logic |
 | SYS-BOOT-014 | Programming entry from the application | SC-BOOT-01, stm_tcu_modes |  |
-| SYS-BOOT-015 | Rejected application | SC-BOOT-03, cmp_tcu_software_parts |  |
+| SYS-BOOT-015 | Application header written last | SC-BOOT-01, SC-BOOT-03, SC-BOOT-05, cmp_tcu_software_parts |  |
 
 ### 9.2 Safety goals -> safe-state scenarios
 
@@ -471,33 +471,31 @@ updated spec text; no `ASSUMPTION` marker remains for them.
 | F-17 | Lockout rule of security level 0x01 | reprogramming section 3 | SC-DIA-03 |
 | F-18 | Mode "Bootloader"; no `TCU_Status` before control active | system_context section 5, SYS-COM-004 note | stm_tcu_modes, SC-STA-01 |
 
-### 10.2 New findings
+### 10.2 Spec findings N-01 .. N-11 (resolved)
 
-These findings came up while drawing the diagrams. The specs are not changed by this task.
-Each finding needs a decision by the user and, if accepted, a separate spec update.
+These findings came up while drawing the diagrams (version 0.1 of this document). The user
+decided them and the specs were updated with commit `0fcaba6` (development log entry
+"Spec findings N-01 .. N-11 from the system design (spec update)"). The diagrams draw the
+updated spec text.
 
-| # | Severity | Finding | Affects | Proposal | Shown in |
-|---|---|---|---|---|---|
-| N-01 | low | A selector fault while P, R or N was the last valid position is not a limp-home condition. It sets FaultBits 0 and its DTC, but no requirement of section 3.5 asks for the fault lamp (SYS-HMI-001), so FaultLamp stays OFF. | SYS-HMI-001, SYS-SEL-002 | Confirm "lamp OFF" (the fault recovers by itself), or add the selector fault to the lamp conditions of SYS-HMI-001. | SC-SEL-02 |
-| N-02 | low | The value of `TCU_Status.SelectorState` while the selector fault is set is not stated. The position is then treated as N (SYS-SEL-002); the signal could show 2 (N, as used) or 7 (invalid). | can_matrix section 3.5 | State "7 = invalid while the selector fault is set" (the console then shows the fault). | SC-SEL-02 (value not drawn) |
-| N-03 | low | The value of `TCU_Status.OilTemp` while the substitute 80 degC is used is not stated: 120 (80 degC) or 0xFF (invalid). The substitute is used with an oil temperature sensor fault, a `SIM_Analog` timeout, and before the first reception. | can_matrix section 3.5, SYS-FLT-005 | Send 0xFF while the substitute is used. | SC-FLT-03, SC-COM-01 (value not drawn) |
-| N-04 | low | It is not stated whether the pressure plausibility runs with a line pressure sensor fault. The voltage is then out of range and the value is clamped (can_matrix section 4), so SYS-SEN-006 would also set the pressure fault (bit 3, P0840-64) after 500 ms. For the `SIM_Analog` timeout the check is suspended (can_matrix section 6). Limp-home is entered in both cases; only FaultBits and DTCs differ. | SYS-SEN-006, SYS-SEN-004 | Suspend SYS-SEN-006 while the line pressure sensor fault is set, as for the `SIM_Analog` timeout. | SC-FLT-04 (note) |
-| N-05 | low | After a message is ignored because its AliveCtr jumped by more than 2, the reference for the next counter is not stated: the ignored frame or the last accepted frame. With the last accepted frame, one jump makes every later frame "jumped", and a timeout follows after 3 frames. | SYS-COM-003 | Compare the next counter with the counter of the last received frame, whether that frame was ignored or not. | SC-COM-02 (note) |
-| N-06 | medium | During a bus-off the TCU receives nothing, so the communication faults of the three plant messages are set after 30 ms. That is long before the bus-off fault (1000 ms). These faults enter limp-home with the 100 ms reaction of SYS-FLT-003, which cannot be met while the TCU cannot transmit; the F-10 exception covers only the bus-off fault. As a result, the 1000 ms window of SYS-COM-006 avoids limp-home only for an outage shorter than 30 ms. | SYS-FLT-003, SYS-COM-002, SYS-COM-006 | Extend the SYS-FLT-003 exception to every fault that is set while the TCU is in bus-off: red LED within 100 ms, outputs when the bus is back. Confirm that an outage longer than 30 ms enters limp-home through the communication faults. | SC-COM-04 |
-| N-07 | low | "At startup" in SYS-SFT-008 is not tied to an instant. Until the first `SIM_Analog` reception the substitute 80 degC applies (SYS-COM-002 note, can_matrix section 6). Evaluated on it, 4th is released. A first real value of -7 degC then lies inside the -10 .. -5 degC hysteresis band, so the inhibit is never set. | SYS-SFT-008, SYS-COM-002 | "At startup" = at the first oil temperature received after reset (first `SIM_Analog` reception without a sensor fault). | SC-SFT-07 (ASSUMPTION A-01) |
-| N-08 | low | The effect of `10 01` on an active `28` (transmission stopped) or `85` (DTC setting off) in the application is not stated; only the S3 timeout undoes them (SYS-DIA-003). ISO 14229-1 ends both when the default session is entered. | SYS-DIA-003, reprogramming section 3 | State in SYS-DIA-003 that every return to the default session (`10 01` or S3) undoes `28` and `85`. | SC-DIA-01 (note) |
-| N-09 | low | It is not stated whether the failed-attempt counter and the 10 s delay survive a reset. No RAM is kept across a reset (reprogramming sections 5, 8), so a reset (`11 01` in the PBL, S3 timeout, power cycle) gives 3 new attempts and bypasses the lockout. | SYS-BOOT-005, reprogramming section 3 | Accept this and state it (educational security, v1), or start the PBL with the 10 s delay active after every reset (an ISO 14229-1 option). | SC-BOOT-02 (note) |
-| N-10 | medium | SYS-BOOT-007 says the next reset "shall end in the PBL (SYS-BOOT-002)". That holds only for an interruption during the erase or the download (steps 13 .. 16). (a) Interrupted in steps 5 .. 12, the application area is unchanged and the PBL starts the previous application (SYS-BOOT-001). (b) Interrupted after a complete download (step 16) but before `0202` / `FF01` completed, a complete, self-consistent image passes the PBL check and starts, although the bootloader never ran checkMemory / checkProgrammingDependencies on it (SG-06 "not accepted by the bootloader"). | SYS-BOOT-007, SG-06 | Reword SYS-BOOT-007: "... the next reset shall start the unchanged or a completely programmed valid application (SYS-BOOT-001) or end in the PBL default session (SYS-BOOT-002), and a full new programming sequence shall succeed". For (b), either accept it (the PBL check covers the `FF01` rules and the image CRC32) or let the SBL write the header sector last, after a passed `0202` / `FF01` (design of TASK-024). | SC-BOOT-05 |
-| N-11 | low | When the gear of the shift schedule would exceed the 6000 rpm prediction at drive engagement, the gear that is actually selected is not named. "Within the limit of SYS-SFT-005" and the verification ("N -> D at 100 km/h selects no gear below 2nd") imply the lowest gear within the limit. | SYS-SFT-006, SYS-SEL-005 | State "the schedule gear, or the lowest higher gear whose predicted input shaft speed is <= 6000 rpm". | SC-SFT-02, SC-SEL-05 |
+| # | Topic | Decision | Resolved in | Shown in |
+|---|---|---|---|---|
+| N-01 | Fault lamp on a selector fault outside D | lamp and red LED ON while the selector fault is set | SYS-HMI-001 | SC-SEL-02 |
+| N-02 | `TCU_Status.SelectorState` during the selector fault | 7 (invalid) | can_matrix section 3.5 | SC-SEL-02, SC-COM-01 |
+| N-03 | `TCU_Status.OilTemp` while the substitute is used | 0xFF (invalid) | can_matrix section 3.5 | SC-FLT-03, SC-COM-01 |
+| N-04 | Pressure plausibility with a line pressure sensor fault | suspended | SYS-SEN-006 | SC-FLT-04 |
+| N-05 | Alive counter reference after an ignored message | last received message, ignored or not | SYS-COM-003 | SC-COM-02 |
+| N-06 | Faults set during a bus-off | SYS-FLT-003 exception for every fault set in bus-off; outage > 30 ms enters limp-home through the communication faults | SYS-FLT-003 | SC-COM-04 |
+| N-07 | Instant of the cold-oil start-up check | first oil temperature received after reset | SYS-SFT-008 | SC-SFT-07 |
+| N-08 | `10 01` and active `28` / `85` | every return to the default session undoes them | SYS-DIA-003 | SC-DIA-01 |
+| N-09 | Security lockout across a reset | not kept; accepted for v1 | reprogramming section 3 | SC-BOOT-02 |
+| N-10 | Interrupted programming; unchecked image after a complete download | the SBL programs the application header sector last, after `0202` / `FF01` passed; SYS-BOOT-007 reworded | SYS-BOOT-007, SYS-BOOT-015, reprogramming sections 2, 11 | SC-BOOT-01, SC-BOOT-03, SC-BOOT-05, cmp_tcu_software_parts |
+| N-11 | Gear at drive engagement when the schedule gear exceeds 6000 rpm | lowest higher gear within the limit | SYS-SFT-006, SYS-SEL-005 | SC-SFT-02, SC-SEL-05 |
 
 ### 10.3 Assumptions in the diagrams
 
-| # | Assumption | Diagram | Open question |
-|---|---|---|---|
-| A-01 | The start-up check of SYS-SFT-008 uses the first received oil temperature, not the substitute value 80 degC. | SC-SFT-07 | N-07 |
-
-No other step is drawn without a spec basis. The gaps N-02 .. N-05, N-08 and N-09 are noted in
-the diagrams without drawing an assumed behaviour.
+None. Assumption A-01 of version 0.1 (cold-oil start-up check) is resolved by N-07. No step is
+drawn without a spec basis.
 
 ### 10.4 Deviations from the approved plan
 
@@ -508,5 +506,5 @@ the diagrams without drawing an assumed behaviour.
   (PBL / SBL) applies.
 - SIM-CON-004 (scripted scenarios and logging) has no TCU interaction. It is shown in
   `cmp_system_context` (I-14) and is not drawn in a sequence diagram.
-- New findings N-01 .. N-11 (section 10.2) and assumption A-01 (section 10.3) were found while
-  drawing the diagrams.
+- New findings N-01 .. N-11 and assumption A-01 were found while drawing the diagrams and are
+  resolved (sections 10.2, 10.3).

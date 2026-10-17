@@ -57,6 +57,6 @@ TCU --> Tester : 62 F1 86 01
 note over Tester, TCU
 14, 19 01 / 19 02, 22, 3E, 10 and 11 01 are available in the default and extended sessions;
 27 01 / 02, 28, 31 01 02 03 and 85 only in the extended session (reprogramming section 3).
-Whether 10 01 also undoes active 28 / 85 is not stated (open question N-08 in system_design.md).
+Every return to the default session, by 10 01 or by the S3 timeout, undoes 28 and 85 (SYS-DIA-003).
 end note
 @enduml

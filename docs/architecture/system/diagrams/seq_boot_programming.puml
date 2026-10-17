@@ -10,7 +10,7 @@ participant "SBL" as SBL
 end box
 
 note over Tester, SBL
-Covers: SYS-BOOT-001, SYS-BOOT-004, SYS-BOOT-005, SYS-BOOT-006, SYS-BOOT-008, SYS-BOOT-010, SYS-BOOT-011,
+Covers: SYS-BOOT-001, SYS-BOOT-004, SYS-BOOT-005, SYS-BOOT-006, SYS-BOOT-008, SYS-BOOT-010, SYS-BOOT-011, SYS-BOOT-015,
 SYS-BOOT-014, SYS-DIA-001, SYS-DIA-002, SYS-DIA-004, SYS-DIA-005, SYS-COM-005, SYS-STA-001,
 SIM-TST-001, SIM-TST-004, SIM-GW-002, SIM-PLT-004
 Sequence of reprogramming section 2. UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9;
@@ -110,6 +110,7 @@ SBL -> SBL : clear the flash cache, disable speculation (RB-03); CRC OK
 SBL --> Tester : 71 01 02 02 00
 Tester -> SBL : [18] 31 01 FF 01
 SBL -> SBL : header valid, hw_id 0x0947_0001,\nmin_pbl_version <= PBL version (reprogramming section 11)
+SBL -> SBL : program the application header sector 0x0001_4000 .. 0x0001_5FFF last,\nafter 0202 and FF01 passed (SYS-BOOT-015)
 SBL --> Tester : 71 01 FF 01 00
 Tester -> SBL : [19] 11 01
 SBL --> Tester : 51 01

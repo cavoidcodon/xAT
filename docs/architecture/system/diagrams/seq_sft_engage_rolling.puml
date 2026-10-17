@@ -17,7 +17,7 @@ Plant -> TCU : SIM_Driver: Selector = 2 (N), Throttle;\nSIM_Speed: OutputShaftSp
 TCU -> TCU : prepared gear = schedule gear within the 6000 rpm limit\n(SYS-SEL-005, SYS-SFT-005)
 note right of TCU: prediction = OutputShaftSpeed x ratio of the new gear;\nat 100 km/h 1st gives about 8460 rpm > 6000 rpm,\nso no gear below 2nd (SYS-SFT-005 verification)
 TCU -> Plant : TCU_Actuators: SS_A / SS_B of the prepared gear
-note right of TCU: the gear selected when the schedule gear itself exceeds\nthe limit is not named (open question N-11 in system_design.md)
+note right of TCU: if the schedule gear exceeds the limit, the lowest higher gear\nwhose prediction is <= 6000 rpm is selected (SYS-SFT-006)
 
 User -> Console : select D
 Console -> Plant : selector D

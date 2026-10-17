@@ -30,7 +30,8 @@ alt counter frozen
 else counter jumped by more than 2
   Plant -> TCU : SIM_Speed: AliveCtr = 10
   TCU -> TCU : jump of 4 > 2: message ignored (SYS-COM-003)
-  note right of TCU: the reference for the next counter (last received or\nlast accepted frame) is not stated\n(open question N-05 in system_design.md)
+  Plant -> TCU : SIM_Speed: AliveCtr = 11
+  TCU -> TCU : +1 compared with the last received message (10, ignored or not):\naccepted (SYS-COM-003)
 else counter +1 or +2 (one frame lost)
   Plant -> TCU : SIM_Speed: AliveCtr = 8
   TCU -> TCU : jump of 2: accepted

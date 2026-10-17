@@ -18,7 +18,7 @@ Console -> Plant : oil start value (SIM-PLT-007)
 note over TCU: until the first SIM_Analog reception the substitute 80 degC applies\n(SYS-COM-002 note, can_matrix section 6)
 Plant -> TCU : SIM_Analog: OilTempVoltage (-7 degC), first reception
 TCU -> TCU : at start-up oil temperature <= -5 degC -> 4th inhibited (SYS-SFT-008)
-note right of TCU: ASSUMPTION: the start-up check uses the first received\noil temperature, not the substitute value 80 degC\n(open question N-07 in system_design.md)
+note right of TCU: "at startup" = the first oil temperature received after reset,\nnot the substitute value 80 degC (SYS-SFT-008)
 note over Plant, TCU: D, accelerating
 TCU -> TCU : schedule gives 4th, inhibited -> 3rd kept, 4th not commanded
 TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (3rd)

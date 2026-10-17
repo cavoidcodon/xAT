@@ -9,6 +9,7 @@ participant "Red LED\n(TCU board)" as LED
 
 note over User, LED
 Covers: SYS-SEL-002, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-03
+TCU_Status.SelectorState = 7 (invalid) while the selector fault is set (can_matrix section 3.5).
 CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
 end note
 
@@ -22,27 +23,30 @@ end
 
 alt last valid position before the fault was P, R or N
   TCU -> TCU : t0 + 100 ms: treat the selector as N, set the selector fault\n(FaultBits 0, DTC P0705-29) (SYS-SEL-002)
-  TCU -> Plant : TCU_Actuators: solenoid pattern of SYS-SEL-005, SLS = OFF, RLS = OFF, FaultLamp = OFF
-  note right of TCU: not a limp-home condition (SYS-FLT-002);\nno requirement of system_requirements\nsection 3.5 asks for the lamp (SYS-HMI-001)
-  TCU -> Plant : TCU_Status: Mode = 0 (Normal), FaultBits bit 0 = 1
+  TCU -> Plant : TCU_Actuators: solenoid pattern of SYS-SEL-005, SLS = OFF, RLS = OFF, FaultLamp = ON
+  note right of TCU: not a limp-home condition (SYS-FLT-002);\nlamp ON while the selector fault is set (SYS-HMI-001)
+  TCU -> LED : ON (SYS-HMI-001)
+  TCU -> Plant : TCU_Status: Mode = 0 (Normal), SelectorState = 7, FaultBits bit 0 = 1
   Plant -> Plant : no drive (treated as N): safe state of SG-03
   User -> Console : remove the injection
   Plant -> TCU : SIM_Driver: Selector valid (t2)
   ... valid position received for 500 ms ...
   TCU -> TCU : t2 + 500 ms: selector fault cleared (SYS-SEL-002, SYS-FLT-008)
-  TCU -> Plant : TCU_Status: FaultBits bit 0 = 0
+  TCU -> Plant : TCU_Actuators: FaultLamp = OFF
+  TCU -> LED : OFF (SYS-HMI-001)
+  TCU -> Plant : TCU_Status: SelectorState = accepted position, FaultBits bit 0 = 0
 else last valid position before the fault was D
   TCU -> TCU : t0 + 100 ms: treat the selector as N, set the selector fault\n(SYS-SEL-002) -> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
   TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON,\nSLS = OFF, RLS = OFF (SYS-FLT-001)
   note right of TCU: <= 100 ms after the fault is set (SYS-FLT-003)
   TCU -> LED : ON (SYS-HMI-001)
-  TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 0 = 1
+  TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), SelectorState = 7, FaultBits bit 0 = 1
   User -> Console : remove the injection
   Plant -> TCU : SIM_Driver: Selector valid (t2)
   ... valid position received for 500 ms ...
   TCU -> TCU : t2 + 500 ms: selector fault cleared (SYS-SEL-002, SYS-FLT-008);\nlimp-home stays latched until the next power cycle (SYS-FLT-004)
   TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON
-  TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 0 = 0
+  TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), SelectorState = accepted position, FaultBits bit 0 = 0
 end
 
 note over Plant, TCU: Safe state of SG-03: an unknown position is treated as N, no drive torque is prepared.
