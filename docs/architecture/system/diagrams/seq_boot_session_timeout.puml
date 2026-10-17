@@ -1,0 +1,45 @@
+@startuml seq_boot_session_timeout
+title SC-BOOT-06 - Session timeout in the bootloader programming session
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+box "TCU"
+participant "Application" as App
+participant "PBL" as PBL
+participant "SBL" as SBL
+end box
+
+note over Tester, SBL
+Covers: SYS-BOOT-009, SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SIM-PLT-004
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+S3server = 5000 ms (reprogramming section 12).
+end note
+
+alt PBL programming session
+  Tester -> PBL : last request (t0)
+  PBL --> Tester : response
+  note over Tester: the tester disappears
+  ... no request for S3 = 5000 ms ...
+  PBL -> PBL : t0 + 5000 ms: reset the MCU (SYS-BOOT-009)
+else SBL programming session
+  Tester -> SBL : last request (t0)
+  SBL --> Tester : response
+  note over Tester: the tester disappears
+  ... no request for S3 = 5000 ms ...
+  SBL -> SBL : t0 + 5000 ms: reset the MCU (SYS-BOOT-009)
+end
+note over PBL, SBL: reset: the SBL in RAM and the unlocked security state are discarded (SYS-BOOT-009 rationale)
+
+alt application valid
+  PBL -> PBL : application check valid (SYS-BOOT-001), 50 ms boot window without 10 02
+  PBL -> App : start the application
+  App -> Plant : TCU_Actuators, TCU_Status (control active <= 500 ms, SC-STA-01)
+else application invalid (e.g. erased by the SBL before the timeout)
+  PBL -> PBL : application check fails -> default session, no time limit (SYS-BOOT-002)
+  note over PBL: no S3 reset in the default session; no TCU_Actuators / TCU_Status (SYS-BOOT-008)
+  Plant -> Plant : hydraulic default (SIM-PLT-004)
+end
+
+note over Tester, SBL: 3E 80 every 2 s keeps the programming session alive (reprogramming section 2).
+@enduml

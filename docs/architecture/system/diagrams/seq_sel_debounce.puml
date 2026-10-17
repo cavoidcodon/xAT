@@ -1,0 +1,41 @@
+@startuml seq_sel_debounce
+title SC-SEL-01 - Selector debounce: change accepted after 50 ms, short glitch ignored
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SEL-001, SIM-CON-002, SIM-PLT-002
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+SIM_Driver.Selector: 0 = P, 1 = R, 2 = N, 3 = D (can_matrix section 3.1).
+end note
+
+note over TCU: control active, mode Normal, vehicle at standstill,\nselector N accepted, 1st prepared: SS_A = ON, SS_B = ON (SYS-SEL-005)
+
+== change N -> D ==
+User -> Console : select D
+Console -> Plant : selector D
+Plant -> Plant : lever in D: engages the gear of SS_A / SS_B = 1st (SIM-PLT-002)
+Plant -> TCU : SIM_Driver: Selector = 3 (D) (t0, first frame with D)
+loop every 10 ms
+  Plant -> TCU : SIM_Driver: Selector = 3 (D)
+end
+... Selector = 3 received unchanged for 50 ms ...
+TCU -> TCU : t0 + 50 ms: D accepted (SYS-SEL-001)
+TCU -> Plant : TCU_Status: SelectorState = 3 (D), GearTarget = 1 (next 100 ms frame)
+
+== glitch shorter than 50 ms ==
+Plant -> TCU : SIM_Driver: Selector = 2 (N) (t1)
+note right of TCU: a new position is accepted only after\nit has been received unchanged for 50 ms
+... less than 50 ms ...
+Plant -> TCU : SIM_Driver: Selector = 3 (D) again
+TCU -> TCU : N not accepted, D kept (SYS-SEL-001)
+TCU -> Plant : TCU_Status: SelectorState = 3 (D) unchanged
+
+note over Plant, TCU
+After reset the selector position is N until the first position is accepted (SYS-SEL-001), see SC-STA-01.
+An invalid value (4 .. 7) for longer than 100 ms is handled in SC-SEL-02.
+end note
+@enduml

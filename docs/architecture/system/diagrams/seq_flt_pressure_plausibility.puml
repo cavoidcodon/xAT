@@ -1,0 +1,38 @@
+@startuml seq_flt_pressure_plausibility
+title SC-FLT-06 - Line pressure plausibility: pressure fault, limp-home
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-SEN-006, SYS-SEN-003, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001,
+SIM-PLT-007, SIM-CON-003, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, mode Normal
+note over Plant, TCU
+Expected pressure for the commanded PCS_Duty: 0 % -> 20 bar, 100 % -> 3 bar, linear (SYS-ACT-003, SIM-PLT-007).
+Measured pressure: p = (LinePressVoltage - 500) x 25 / 4000 bar (can_matrix section 4, SYS-SEN-003).
+end note
+TCU -> Plant : TCU_Actuators: PCS_Duty (from the table)
+Plant -> Plant : line pressure from PCS_Duty, first-order lag 50 ms (SIM-PLT-007)
+User -> Console : inject line pressure stuck (SIM-CON-003)
+Console -> Plant : line pressure stuck
+Plant -> TCU : SIM_Analog: LinePressVoltage of the stuck pressure (t0)
+loop every 10 ms
+  TCU -> TCU : measured pressure differs from the expected pressure by more than 3 bar
+end
+... longer than 500 ms ...
+TCU -> TCU : t0 + 500 ms: pressure fault (FaultBits 3, DTC P0840-64) (SYS-SEN-006)\n-> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
+note right of TCU: <= 100 ms after the fault is set (SYS-FLT-003)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 3 = 1
+note over Plant, TCU: Safe state of SG-04: limp-home; the pressure fault stays set until the next power cycle (SYS-FLT-008).
+
+note over TCU: the plausibility check is suspended while the line pressure\nis not available (SIM_Analog timeout, SC-COM-01, can_matrix section 6)
+@enduml

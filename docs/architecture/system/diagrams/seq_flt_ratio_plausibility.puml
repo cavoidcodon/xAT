@@ -1,0 +1,40 @@
+@startuml seq_flt_ratio_plausibility
+title SC-FLT-05 - Gear ratio plausibility: ratio fault, limp-home
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-SEN-005, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: mode Normal, D selected, no shift in progress, OutputShaftSpeed > 200 rpm (SYS-SEN-005)
+
+alt console injects an input shaft speed offset
+  User -> Console : shaft speed offset (SIM-CON-003)
+  Console -> Plant : InputShaftSpeed offset
+else console injects a solenoid stuck in the plant
+  User -> Console : solenoid stuck ON or OFF (SIM-CON-003)
+  Console -> Plant : solenoid stuck
+  Plant -> Plant : engages another gear than commanded (SIM-PLT-002)
+end
+Plant -> TCU : SIM_Speed: InputShaftSpeed / OutputShaftSpeed differs from the\ncommanded gear ratio by more than 10 % (t0)
+loop every 10 ms
+  Plant -> TCU : SIM_Speed
+end
+... more than 10 % for longer than 500 ms ...
+TCU -> TCU : t0 + 500 ms: ratio fault (FaultBits 2, DTC P0730-00) (SYS-SEN-005)\n-> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
+note right of TCU: <= 100 ms after the fault is set (SYS-FLT-003)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 2 = 1
+note over Plant, TCU: Safe state of SG-04: limp-home; the ratio fault stays set until the next power cycle (SYS-FLT-008).
+
+opt not D, a shift in progress, or OutputShaftSpeed <= 200 rpm
+  TCU -> TCU : no ratio plausibility check (SYS-SEN-005)
+end
+@enduml

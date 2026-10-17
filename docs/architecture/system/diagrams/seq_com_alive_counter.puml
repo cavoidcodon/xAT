@@ -1,0 +1,43 @@
+@startuml seq_com_alive_counter
+title SC-COM-02 - Alive counter frozen or jumped
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-COM-003, SYS-COM-002, SYS-FLT-002, SIM-PLT-001, SIM-CON-001, SIM-CON-003, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+AliveCtr: 4 bits, +1 (mod 16) per transmission (can_matrix section 3).
+end note
+
+note over TCU: control active, mode Normal; example message SIM_Speed (0x101)
+Plant -> TCU : SIM_Speed: AliveCtr = 5
+Plant -> TCU : SIM_Speed: AliveCtr = 6
+TCU -> TCU : +1: accepted
+
+alt counter frozen
+  User -> Console : freeze the alive counter of SIM_Speed (SIM-CON-003)
+  Console -> Plant : freeze AliveCtr
+  Plant -> TCU : SIM_Speed: AliveCtr = 6
+  TCU -> TCU : counter did not change: message ignored (1)
+  Plant -> TCU : SIM_Speed: AliveCtr = 6
+  TCU -> TCU : ignored (2)
+  Plant -> TCU : SIM_Speed: AliveCtr = 6
+  TCU -> TCU : ignored (3): 3 consecutive ignored messages are treated\nas a timeout (SYS-COM-003)
+  TCU -> TCU : communication fault SIM_Speed (FaultBits 8), substitute values,\nlimp-home (SYS-COM-002, SYS-FLT-002), see SC-COM-01
+else counter jumped by more than 2
+  Plant -> TCU : SIM_Speed: AliveCtr = 10
+  TCU -> TCU : jump of 4 > 2: message ignored (SYS-COM-003)
+  note right of TCU: the reference for the next counter (last received or\nlast accepted frame) is not stated\n(open question N-05 in system_design.md)
+else counter +1 or +2 (one frame lost)
+  Plant -> TCU : SIM_Speed: AliveCtr = 8
+  TCU -> TCU : jump of 2: accepted
+end
+
+note over Plant, TCU
+The TCU increments the AliveCtr of TCU_Actuators and TCU_Status by 1 per transmission (SYS-COM-003);
+the console shows alive counter errors (SIM-CON-001).
+end note
+@enduml

@@ -1,0 +1,58 @@
+@startuml seq_sta_normal_cycle
+title SC-STA-04 - Normal cycle over the full CAN path
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "can0 / slcand\n(Pi5, SocketCAN)" as Can0
+participant "Gateway\n(FRDM-MCXN236)" as GW
+participant "CAN bus\n500 kbit/s" as Bus
+participant "TCU" as TCU
+participant "Debug UART\n(MCU-Link VCOM)" as UART
+
+note over User, UART
+Covers: SYS-COM-001, SYS-COM-003, SYS-COM-004, SYS-SEN-001, SYS-TIM-001, SYS-HMI-002,
+SIM-PLT-001, SIM-PLT-006, SIM-GW-001, SIM-GW-002, SIM-CON-001, SIM-CON-002
+Classic CAN 2.0B, 11-bit identifiers, 500 kbit/s, sample point 87.5 %, TJA1057 (can_matrix section 1).
+The gateway forwards every frame in both directions without filtering or changing it (DC-05, SIM-GW-001).
+end note
+
+User -> Console : selector, brake, throttle (keyboard, SIM-CON-002)
+Console -> Plant : driver inputs (I-15)
+note over TCU: control active, mode Normal
+
+loop every 10 ms
+  Plant -> Plant : compute engine torque, vehicle acceleration and shaft speeds\n(SIM-PLT-006, system parameters of system_context section 4.1)
+  Plant -> Can0 : SIM_Driver 0x100 (Selector, Brake, Throttle, AliveCtr)\nSIM_Speed 0x101 (InputShaftSpeed, OutputShaftSpeed, AliveCtr)\nSIM_Analog 0x102 (OilTempVoltage, LinePressVoltage, AliveCtr)
+  note right of Plant: AliveCtr +1 (mod 16) per frame\n(SIM-PLT-001, SYS-COM-003)
+  Can0 -> GW : SLCAN (Lawicel) ASCII frames over USB VCOM
+  GW -> Bus : same CAN frames, unchanged
+  note right of GW: <= 2 ms per direction, no loss\nup to 60 % bus load (SIM-GW-002)
+  Bus -> TCU : 0x100, 0x101, 0x102 (SYS-COM-001)
+  TCU -> TCU : vehicle speed from OutputShaftSpeed, final drive 3.23,\ntyre radius 0.31 m: 0 .. 250 km/h, 0.1 km/h (SYS-SEN-001)
+  TCU -> TCU : sensor inputs, selector logic, shift control,\nactuator commands, fault detection (SYS-TIM-001)
+  TCU -> Bus : TCU_Actuators 0x200 (SS_A, SS_B, RLS, SLS, FaultLamp, PCS_Duty, AliveCtr)
+  note right of TCU: every 10 ms +/- 1 ms (SYS-COM-004)
+  Bus -> GW : 0x200
+  GW -> Can0 : SLCAN frame over USB VCOM
+  Can0 -> Plant : TCU_Actuators
+  Plant -> Plant : engage the gear of SS_A / SS_B, line pressure from PCS_Duty
+end
+
+loop every 100 ms
+  TCU -> Bus : TCU_Status 0x201 (GearActual, GearTarget, Mode, SelectorState,\nShiftInProgress, VehicleSpeed, FaultBits, OilTemp, AliveCtr)
+  note right of TCU: every 100 ms +/- 1 ms (SYS-COM-004, SYS-TIM-001)
+  Bus -> GW : 0x201
+  GW -> Can0 : SLCAN frame over USB VCOM
+  Can0 -> Console : all frames 0x100 .. 0x201
+  Plant -> Console : plant state (I-15)
+  Console -> User : every signal of can_matrix, fault bits as text, cycle times,\nalive counter errors, refreshed at least every 100 ms (SIM-CON-001)
+end
+note over Console: how the console obtains the frames (own can0 socket\nor through the plant model) is a design decision of the console
+
+opt debug output (SYS-HMI-002, Could)
+  loop every 500 ms
+    TCU -> UART : status line: selector, gear, vehicle speed, mode, fault bits
+  end
+end
+@enduml

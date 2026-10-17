@@ -1,0 +1,52 @@
+@startuml cmp_tcu_software_parts
+title TCU software parts and memory regions (DC-04, reprogramming sections 1, 5 .. 7)
+
+left to right direction
+
+component "MCU-Link SWD (E-07)\ndebugger" as Dbg
+component "PBL (E-02)\nprimary bootloader, separate image,\nupdated by debugger only" as PBL
+component "Application (E-04)\nseparate image, written by the SBL" as App
+component "SBL (E-03)\nsecondary bootloader, separate image,\ndownloaded for each programming session" as SBL
+
+package "Flash bank 0 (8 KiB sectors, 16-byte phrases)" {
+  database "PBL region\n0x0000_0000 .. 0x0000_FFFF (64 KiB)" as FlashPbl
+  database "Boot info A 0x0001_0000 .. 0x0001_1FFF\nBoot info B 0x0001_2000 .. 0x0001_3FFF\nI-17b boot info record: magic, sequence,\nfingerprint (F15A), programming counter (FD00), CRC" as FlashBi
+  database "Application header 0x0001_4000 .. 0x0001_43FF (1 KiB)\nI-17a image header: magic, header_crc32, hw_id 0x0947_0001,\nsw_version, image_size, image_crc32, min_pbl_version" as FlashHdr
+  database "Application image (vector table first)\n0x0001_4400 .. 0x000F_FFFF (943 KiB)" as FlashImg
+}
+database "Flash bank 1\n0x0010_0000 .. 0x001F_FFFF\nreserved" as FlashB1
+
+package "RAM" {
+  database "SBL load area (SRAMX) 0x0400_0000 .. 0x0400_FFFF (64 KiB)\nSBL bss + stack 0x0401_0000 .. 0x0401_7FFF" as Sramx
+  database "PBL / application RAM\n0x2000_0000 .. 0x2006_7FFF (416 KiB)" as SysRam
+}
+
+PBL --> SBL : 31 01 03 01: starts the SBL;\nI-17c hand-over in RAM: programming session,\nsecurity unlocked, CAN configuration
+
+PBL ..> FlashHdr : reads I-17a at every start\n(SYS-BOOT-001, SYS-BOOT-013)
+PBL ..> FlashImg : reads for the image CRC32
+PBL ..> FlashBi : reads newest valid slot (DIDs)
+PBL --> Sramx : writes the SBL image with 36,\nonly inside the load area (reprogramming 11.1)
+PBL ..> SysRam : uses
+
+App ..> FlashHdr : reads sw_version (DID F181)
+App ..> FlashBi : reads (DIDs)
+App ..> SysRam : uses
+
+SBL ..> Sramx : runs only from RAM (RB-04)
+SBL --> FlashHdr : erase / write (SYS-BOOT-004); erases the header\nsector after a failed 0202 / FF01 (SYS-BOOT-015)
+SBL --> FlashImg : erase / write (SYS-BOOT-004)
+SBL --> FlashBi : writes the slot that is not the newest
+SBL ..> FlashPbl : erase / write refused, NRC 31 (SYS-BOOT-006)
+SBL ..> FlashB1 : erase / write refused, NRC 31 (SYS-BOOT-006)
+
+Dbg --> FlashPbl : flash PBL, no mass erase (SYS-BOOT-006, RB-06)
+Dbg --> FlashHdr : flash application with a valid header (RB-06)
+
+note top of SBL
+Covers: SYS-BOOT-001, SYS-BOOT-004, SYS-BOOT-006, SYS-BOOT-013, SYS-BOOT-015
+Only the SBL erases or writes flash (DC-04, SYS-BOOT-004); the PBL and the
+application never do (verified by review of the map files).
+No RAM content is kept across a reset (reprogramming sections 5, 8).
+end note
+@enduml

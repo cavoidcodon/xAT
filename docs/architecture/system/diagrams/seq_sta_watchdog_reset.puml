@@ -1,0 +1,48 @@
+@startuml seq_sta_watchdog_reset
+title SC-STA-03 - Application stops its 10 ms cycle: watchdog reset
+
+participant "Plant model" as Plant
+box "TCU"
+participant "PBL" as PBL
+participant "Application" as App
+end box
+
+note over Plant, App
+Covers: SYS-STA-002, SYS-STA-001, SYS-ACT-004, SYS-FLT-004, SYS-FLT-008, SYS-FLT-007, SIM-PLT-004, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over App: control active, mode Normal or Limp-home
+loop every 10 ms
+  Plant -> App : SIM_Driver, SIM_Speed, SIM_Analog
+  App -> Plant : TCU_Actuators (0x200)
+end
+
+App -> App : the application stops executing its 10 ms cycle\n(t1 = time of the last TCU_Actuators frame)
+note over App: no TCU_Actuators, no TCU_Status
+
+... 50 ms without TCU_Actuators ...
+Plant -> Plant : t1 + 50 ms: hydraulic default SS_A = SS_B = OFF, PCS_Duty = 0 %,\nRLS = OFF, SLS = OFF, FaultLamp = OFF (SIM-PLT-004)
+note right of Plant: 3rd gear in D, maximum line pressure
+
+... watchdog expires ...
+note over PBL, App: the watchdog resets the MCU <= 100 ms after the cycle stopped (SYS-STA-002)
+
+== reset (power cycle, system_requirements section 2) ==
+
+note over PBL, App
+The reset clears the limp-home latch (SYS-FLT-004), all fault bits (SYS-FLT-008)
+and the volatile DTC memory (SYS-FLT-007).
+end note
+PBL -> PBL : application check, 50 ms boot window (SC-STA-01)
+PBL -> App : jump to the application
+App -> App : Init: no TCU_Actuators until control is active (SYS-ACT-004)
+App -> Plant : TCU_Actuators (0x200) every 10 ms, TCU_Status (0x201) every 100 ms
+note right of App: control active <= 500 ms after the reset (SYS-STA-001)
+Plant -> Plant : uses TCU_Actuators again
+
+note over PBL, App
+The PBL and the SBL have no watchdog in v1: a hang in the bootloader is recovered by a power cycle;
+the plant stays in the hydraulic default meanwhile (SYS-STA-002 note, SYS-BOOT-008).
+end note
+@enduml

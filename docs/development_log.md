@@ -428,3 +428,98 @@ Findings from planning TASK-026, resolved with the user before any diagram is wr
 
 Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
 with a grep script).
+
+## 2026-10-17: TASK-026 system design (PlantUML)
+
+### Summary
+
+Phase B of TASK-026. The plan was approved by the user before any file was written (AC0). It
+runs on the spec baseline of commit `79929ee` (F-01 .. F-18 resolved in Phase A). Documentation
+only: no code, build or unit test.
+
+- `docs/architecture/system/system_design.md` (new). Sections:
+  - purpose and inputs with versions, design rules ("system level only", diagram conventions);
+  - system elements E-01 .. E-15 and interfaces I-01 .. I-17c;
+  - operating modes and the running software part over time;
+  - allocation of all 61 `Approved` SYS and 18 SIM requirements;
+  - scenario catalogue;
+  - coverage: SYS, SG safe states and SIM -> diagrams;
+  - open questions: F-01 .. F-18 resolved, new findings N-01 .. N-11, assumption A-01.
+- `docs/architecture/system/diagrams/`, 43 PlantUML files:
+  - component diagrams `cmp_system_context`, `cmp_system_interfaces`, `cmp_tcu_software_parts`;
+  - the state diagram `stm_tcu_modes` (index of the scenarios);
+  - 39 sequence diagrams `seq_*`: start-up 4, selector 5, shifting 7, faults 8, CAN 4,
+    diagnostics 4, reprogramming 7.
+- The catalogue and coverage tables of `system_design.md` are generated from the `Covers:` header
+  notes of the diagrams, so the two cannot diverge.
+- `docs/architecture/overview.md`: one link to the system design.
+- `backlog.md`: TASK-026 -> DONE.
+
+### Decisions
+
+- SC-BOOT-01 (19 steps) is one file on three pages (`newpage`): application and hand-over, PBL,
+  SBL and restart. The plan's fallback split into two files was not needed, and the catalogue
+  keeps one file per scenario.
+- The TCU is split into its software parts in the boot scenarios and also in SC-STA-01 .. SC-STA-03
+  and SC-DIA-02, because there the running part is the subject.
+- The diagrams draw the updated spec text of Phase A (e.g. `28 01 01` / `68 01`, `SIM_Analog`
+  timeout -> limp-home, mode "Bootloader", entry with an invalid application). No
+  `ASSUMPTION (F-nn)` marker is used.
+
+### Deviations and findings
+
+- SC-COM-04 shows more than the plan's two branches. During a bus-off the 30 ms reception timeouts
+  set the communication faults first, which leads to finding N-06.
+- SC-BOOT-05 separates three interruption windows: before the erase (previous application
+  starts), during erase / download (PBL default session), and after a complete download (the PBL
+  check decides). This leads to finding N-10.
+- New spec findings N-01 .. N-11 are recorded in `system_design.md` section 10.2, each with a
+  proposal. The specs are not changed (AC5); a spec update needs a separate user decision.
+  The two findings of medium severity:
+  - N-06: the SYS-FLT-003 reaction cannot be met for faults set during a bus-off.
+  - N-10: the wording of SYS-BOOT-007; an image after a complete download starts without `0202` /
+    `FF01`.
+- One `ASSUMPTION:` marker is used (A-01 / N-07, SC-SFT-07): the cold-oil start-up check uses
+  the first received oil temperature, not the substitute 80 degC.
+
+### Verification
+
+| AC | Command / check | Result |
+|---|---|---|
+| AC0 | plan approval | approved by the user before any file was written |
+| AC1 | `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc 0 |
+| AC1 | `plantuml -tpng -o <scratchpad> docs/architecture/system/diagrams/*.puml`; every PNG opened and reviewed | rc 0; 45 PNG (SC-BOOT-01 = 3 pages), no error image, largest 2919 x 1784 px (below the 4096 px limit); layout fixes applied to `cmp_system_interfaces`, `cmp_tcu_software_parts`, `stm_tcu_modes` |
+| AC2 | coverage script (scratchpad, not committed) | `AC2 PASSED`, output below |
+| AC3 | `grep -nwE 'CanIf\|PduR\|CanTp\|Dcm\|Dem\|Rte\|SchM\|EcuM\|Os\|Swc[A-Za-z]*\|runnable\|Rte_[A-Za-z_]*' docs/architecture/system/diagrams/*.puml` | no output (rc 1). A wider case-insensitive sweep (task, API, SWC, port, function, ...) with requirement IDs masked was also clean. |
+| AC4 | spot check: every distinct UDS byte string, NRC and value (ms, rpm, bar, degC, km/h, %, KiB, mV) listed from the diagrams and compared with can_matrix, reprogramming, system_requirements and sim_requirements | all values from the specs; NRCs not named by a spec (`31` for an unknown DID, `35`) labelled `(ISO 14229-1)` |
+| AC5 | `git diff --stat 79929ee -- docs/specs/` | empty |
+| AC6 | `overview.md` link, this entry, backlog DONE | done |
+
+AC2 script output:
+
+```
+specs: 61 Approved SYS, 2 Deleted SYS ['SYS-BOOT-003', 'SYS-BOOT-012'], 18 SIM, 6 SG
+diagrams: 43 files, 39 seq_*
+check 1: 61 coverage rows; Approved SYS without any diagram: ['SYS-TIM-002'] (reason given: True)
+check 2: 84 distinct IDs cited in diagrams, invalid or Deleted: none
+check 3: 43 catalogue rows (39 scenarios), all files exist and all files listed: True
+check 4: SG-01 -> ['SC-FLT-02', 'SC-SEL-04']; diagrams naming SG-01: ['SC-FLT-02', 'SC-SEL-04']
+check 4: SG-02 -> ['SC-SEL-05', 'SC-SFT-02', 'SC-SFT-05']; diagrams naming SG-02: ['SC-SEL-05', 'SC-SFT-02', 'SC-SFT-05']
+check 4: SG-03 -> ['SC-SEL-02', 'SC-SEL-03', 'SC-SEL-05']; diagrams naming SG-03: ['SC-SEL-02', 'SC-SEL-03', 'SC-SEL-05']
+check 4: SG-04 -> ['SC-COM-01', 'SC-COM-02', 'SC-COM-04', 'SC-FLT-01', 'SC-FLT-02', 'SC-FLT-03', 'SC-FLT-04', 'SC-FLT-05', 'SC-FLT-06', 'SC-SFT-06', 'SC-STA-03']; diagrams naming SG-04: ['SC-COM-01', 'SC-COM-02', 'SC-COM-04', 'SC-FLT-01', 'SC-FLT-02', 'SC-FLT-03', 'SC-FLT-04', 'SC-FLT-05', 'SC-FLT-06', 'SC-SFT-06', 'SC-STA-03']
+check 4: SG-05 -> ['SC-DIA-04']; diagrams naming SG-05: ['SC-DIA-04']
+check 4: SG-06 -> ['SC-BOOT-03', 'SC-BOOT-04', 'SC-BOOT-05', 'SC-STA-02']; diagrams naming SG-06: ['SC-BOOT-03', 'SC-BOOT-04', 'SC-BOOT-05', 'SC-STA-02']
+check 5: SIM rows 18/18; open questions referenced in diagrams ['N-04', 'N-05', 'N-06', 'N-07', 'N-08', 'N-09', 'N-10', 'N-11']; ASSUMPTION in ['seq_sft_cold_oil.puml'], rows ['A-01']
+
+AC2 PASSED
+```
+
+The checks of the script:
+
+1. every `Approved` SYS has a coverage row, and a diagram or a reason;
+2. every SYS / SIM / SG ID in the diagrams exists and is not `Deleted`;
+3. catalogue rows and files match one to one, titles carry the scenario ID, `@startuml <file name>`,
+   and the `Covers:` header equals the catalogue *Covers* column;
+4. every SG has a safe-state row whose scenarios name the SG;
+5. SIM coverage is complete, every open question referenced in a diagram is defined, and every
+   `ASSUMPTION` is listed.

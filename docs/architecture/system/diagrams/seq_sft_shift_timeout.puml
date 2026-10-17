@@ -1,0 +1,38 @@
+@startuml seq_sft_shift_timeout
+title SC-SFT-06 - Shift not complete within 800 ms: shift fault, limp-home
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-SFT-007, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001,
+SIM-CON-003, SIM-PLT-002, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: D in 2nd, mode Normal, OutputShaftSpeed > 200 rpm
+User -> Console : inject solenoid SS_B stuck ON in the plant (SIM-CON-003)
+Console -> Plant : SS_B stuck ON
+
+TCU -> TCU : t1: start shift 2 -> 3 (SYS-SFT-001, SYS-SFT-003); shift in progress
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (3rd), shift pressure profile
+Plant -> Plant : SS_B stuck ON: pattern OFF / ON, 2nd stays engaged (SIM-PLT-002)
+loop every 10 ms
+  Plant -> TCU : SIM_Speed: InputShaftSpeed / OutputShaftSpeed = ratio 1.63
+end
+note right of TCU: not within +/- 5 % of 1.00
+... 800 ms after t1 without completion ...
+TCU -> TCU : t1 + 800 ms: shift fault (FaultBits 1, DTC P0780-00) (SYS-SFT-007)\n-> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
+note right of TCU: <= 100 ms after the fault is set (SYS-FLT-003)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 1 = 1
+note over Plant, TCU: Safe state of SG-04: limp-home; the shift fault stays set until the next power cycle (SYS-FLT-008).
+
+opt OutputShaftSpeed <= 200 rpm (vehicle near standstill)
+  TCU -> TCU : the shift is considered complete when OutputShaftSpeed is at or below\n200 rpm (SYS-SFT-007): no shift fault
+end
+@enduml

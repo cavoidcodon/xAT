@@ -1,0 +1,127 @@
+@startuml seq_boot_programming
+title SC-BOOT-01 - Nominal programming, steps 1 .. 19 (page 1 of 3: application and hand-over)
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+box "TCU"
+participant "Application" as App
+participant "PBL" as PBL
+participant "SBL" as SBL
+end box
+
+note over Tester, SBL
+Covers: SYS-BOOT-001, SYS-BOOT-004, SYS-BOOT-005, SYS-BOOT-006, SYS-BOOT-008, SYS-BOOT-010, SYS-BOOT-011,
+SYS-BOOT-014, SYS-DIA-001, SYS-DIA-002, SYS-DIA-004, SYS-DIA-005, SYS-COM-005, SYS-STA-001,
+SIM-TST-001, SIM-TST-004, SIM-GW-002, SIM-PLT-004
+Sequence of reprogramming section 2. UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9;
+3E 80 on DIAG_FuncReq 0x7DF every 2 s during the whole sequence, no response (reprogramming section 2, can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04; gateway <= 2 ms per direction (SIM-GW-002).
+end note
+
+note over App: control active, vehicle at standstill, selector P, speed valid;\nthe plant model keeps running on the same can0 (SIM-TST-004)
+
+== Application: preconditions (steps 1 .. 4) ==
+Tester -> App : [1] 10 03
+App --> Tester : 50 03 00 32 01 F4
+Tester -> App : [2] 31 01 02 03
+App --> Tester : 71 01 02 03 00
+note right: checkProgrammingPreconditions OK:\nstandstill, P, speed valid (SYS-DIA-004)
+Tester -> App : [3] 85 02
+App --> Tester : C5 02
+Tester -> App : [4] 28 01 01
+App --> Tester : 68 01
+App -> App : stop TCU_Actuators / TCU_Status, reception continues (SYS-COM-005)
+Plant -> Plant : no TCU_Actuators for 50 ms: hydraulic default (SIM-PLT-004)
+Tester -> App : 3E 80 (0x7DF, every 2 s)
+
+== Hand-over application -> PBL (step 5) ==
+Tester -> App : [5] 10 02
+App -> App : SYS-DIA-004 holds: accept
+App --> Tester : 50 02 00 32 01 F4
+note right of Tester: t5 = start of the programming time (SYS-BOOT-010)
+App -> App : no response to any request until the reset;\nsoftware reset <= 20 ms after the response (SYS-BOOT-014)
+loop every 5 ms until the PBL answers (reprogramming section 9)
+  Tester -> PBL : 10 02
+end
+note over App, PBL: reset; no programming request is stored across the reset (SYS-BOOT-014)
+PBL -> PBL : application check valid (SYS-BOOT-001); boot window 50 ms (SYS-BOOT-011)
+PBL -> PBL : 10 02 received within the 50 ms window
+PBL --> Tester : 50 02 00 32 01 F4
+note right of PBL: PBL programming session;\nno TCU_Actuators / TCU_Status (SYS-BOOT-008)
+
+newpage SC-BOOT-01 - Nominal programming (page 2 of 3: PBL programming session, steps 6 .. 11)
+
+== PBL: security access and SBL download (steps 6 .. 10) ==
+Tester -> PBL : [6] 27 11
+PBL --> Tester : 67 11 <seed, 4 bytes>
+Tester -> PBL : 27 12 <key = rotl32(seed, 7) XOR 0x5A3C_C3A5>
+PBL --> Tester : 67 12
+note right of PBL: level 0x11 unlocked (SYS-BOOT-005)
+Tester -> PBL : [7] 34 00 44 04 00 00 00 <memSize>
+PBL -> PBL : range inside the SBL load area 0x0400_0000 .. 0x0400_FFFF (reprogramming section 11.1)
+PBL --> Tester : 74 20 04 02
+note right of PBL: maxNumberOfBlockLength 0x0402 = 1024 data bytes\n+ SID + block sequence counter (reprogramming section 12)
+loop [8] for each block of the SBL image
+  Tester -> PBL : 36 <bsc> <up to 1024 data bytes>
+  PBL -> PBL : write the block into SRAMX (no flash access, SYS-BOOT-004)
+  PBL --> Tester : 76 <bsc>
+end
+Tester -> PBL : [9] 37
+PBL --> Tester : 77
+Tester -> PBL : [10] 31 01 02 02 <crc32 of the SBL image>
+PBL --> Tester : 71 01 02 02 00
+note right of PBL: checkMemory of the SBL: CRC-32/ISO-HDLC OK
+Tester -> PBL : 3E 80 (0x7DF, every 2 s)
+
+== PBL -> SBL: activation (step 11) ==
+Tester -> PBL : [11] 31 01 03 01
+PBL -> PBL : last 0202 returned 0 and the SBL header is valid\n(magic 0x53544178 xATS, header_crc32) (reprogramming section 11.1)
+PBL -> SBL : start the SBL in SRAMX; hand over programming session,\nsecurity unlocked and CAN configuration in RAM (reprogramming section 1)
+SBL --> Tester : 71 01 03 01 00
+note right of SBL: answered by the SBL; no new 27 needed
+
+newpage SC-BOOT-01 - Nominal programming (page 3 of 3: SBL programming session, steps 12 .. 19, restart)
+
+== SBL: fingerprint, erase, application download (steps 12 .. 16) ==
+Tester -> SBL : [12] 2E F1 5A <fingerprint, 16 bytes>
+SBL -> SBL : write the boot info slot that is not the newest: fingerprint,\nprogramming counter (DID FD00) + 1, sequence + 1 (reprogramming section 7)
+SBL --> Tester : 6E F1 5A
+Tester -> SBL : [13] 31 01 FF 00 44 00 01 40 00 <memSize>
+SBL -> SBL : range inside the application area 0x0001_4000 .. 0x000F_FFFF,\nsector-aligned (8 KiB) (SYS-BOOT-006); runs only from RAM (RB-04)
+loop while the erase is busy
+  SBL --> Tester : 7F 31 78
+  note right of SBL: responsePending at least every\nP2* - 500 ms = 4500 ms (RB-05)
+end
+SBL --> Tester : 71 01 FF 00 00
+Tester -> SBL : [14] 34 00 44 00 01 40 00 <memSize>
+SBL --> Tester : 74 20 04 02
+loop [15] for each block of the application image (1 KiB header first)
+  Tester -> SBL : 36 <bsc> <up to 1024 data bytes>
+  SBL -> SBL : program flash in 16-byte phrases (only the SBL erases / writes flash,\nSYS-BOOT-004); last block padded with 0xFF by the tester
+  SBL --> Tester : 76 <bsc>
+end
+Tester -> SBL : [16] 37
+SBL --> Tester : 77
+Tester -> SBL : 3E 80 (0x7DF, every 2 s)
+
+== SBL: checks and reset (steps 17 .. 19) ==
+Tester -> SBL : [17] 31 01 02 02 <crc32 of the application image>
+SBL -> SBL : clear the flash cache, disable speculation (RB-03); CRC OK
+SBL --> Tester : 71 01 02 02 00
+Tester -> SBL : [18] 31 01 FF 01
+SBL -> SBL : header valid, hw_id 0x0947_0001,\nmin_pbl_version <= PBL version (reprogramming section 11)
+SBL --> Tester : 71 01 FF 01 00
+Tester -> SBL : [19] 11 01
+SBL --> Tester : 51 01
+note right of Tester: end of 11 01: programming time from t5\n<= 60 s for a 256 KiB application (SYS-BOOT-010)
+note over PBL, SBL: reset: the SBL in RAM and the unlocked security state are discarded
+
+== restart ==
+PBL -> PBL : application check valid (SYS-BOOT-001); 50 ms boot window without 10 02
+PBL -> App : jump to the application
+App -> Plant : TCU_Actuators every 10 ms, TCU_Status every 100 ms
+note right of App: control active <= 500 ms after the reset (SYS-STA-001), see SC-STA-01
+Tester -> App : 22 F1 81
+App --> Tester : 62 F1 81 <new sw_version>
+Tester -> Tester : show the result; stop with a clear message on any negative\nresponse or timeout (SIM-TST-001)
+@enduml

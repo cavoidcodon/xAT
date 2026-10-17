@@ -1,0 +1,53 @@
+@startuml seq_boot_security_fail
+title SC-BOOT-02 - Security access failures in the PBL
+
+participant "UDS tester" as Tester
+box "TCU"
+participant "PBL" as PBL
+end box
+
+note over Tester, PBL
+Covers: SYS-BOOT-005, SYS-BOOT-009, SYS-DIA-001, SIM-TST-002
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over PBL: PBL programming session (boot window, or 10 02 from the default session),\nsecurity level 0x11 locked
+
+== download without security access ==
+Tester -> PBL : 34 00 44 04 00 00 00 <memSize>
+PBL --> Tester : 7F 34 33
+note right: securityAccessDenied (reprogramming section 3);\nthe PBL accepts the SBL download only after 27 (SYS-BOOT-005)
+
+== wrong key ==
+loop attempts 1 and 2
+  Tester -> PBL : 27 11
+  PBL --> Tester : 67 11 <seed, 4 bytes>
+  Tester -> PBL : 27 12 <wrong key>
+  PBL --> Tester : 7F 27 35
+  note right: invalidKey (ISO 14229-1)
+end
+Tester -> PBL : 27 11
+PBL --> Tester : 67 11 <seed, 4 bytes>
+Tester -> PBL : 27 12 <wrong key> (attempt 3)
+PBL --> Tester : 7F 27 36
+note right: exceededNumberOfAttempts after 3 failed attempts (SYS-BOOT-005)
+note over PBL: t0 = third failed attempt
+
+== lockout for 10 s ==
+Tester -> PBL : 27 11
+PBL --> Tester : 7F 27 37
+note right: requiredTimeDelayNotExpired: every 27 within 10 s after t0\n(SYS-BOOT-005, reprogramming section 3)
+loop every 2 s during the delay
+  Tester -> PBL : 3E 80 (0x7DF, no response)
+  note right: keeps the session; without any request for 5000 ms\nthe PBL resets (SYS-BOOT-009, SC-BOOT-06)
+end
+... t0 + 10 s ...
+Tester -> PBL : 27 11
+PBL --> Tester : 67 11 <seed, 4 bytes>
+Tester -> PBL : 27 12 <key = rotl32(seed, 7) XOR 0x5A3C_C3A5>
+PBL --> Tester : 67 12
+note right of PBL: level 0x11 unlocked; programming continues at step 7 (SC-BOOT-01)
+
+note over Tester, PBL: Whether the failed-attempt counter and the delay survive a reset is not stated (open question N-09 in system_design.md).
+@enduml

@@ -1,0 +1,45 @@
+@startuml seq_sft_cold_oil
+title SC-SFT-07 - Cold oil: 4th gear inhibited
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SFT-008, SYS-SFT-005, SYS-SFT-004, SYS-SEN-003, SIM-PLT-007, SIM-CON-003
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Oil temperature from OilTempVoltage: T = (U - 500) x 190 / 4000 - 40 (can_matrix section 4, SYS-SEN-003).
+end note
+
+== start-up with cold oil ==
+User -> Console : oil start temperature at or below -5 degC (example -7 degC, SYS-SFT-008 verification)
+Console -> Plant : oil start value (SIM-PLT-007)
+note over TCU: until the first SIM_Analog reception the substitute 80 degC applies\n(SYS-COM-002 note, can_matrix section 6)
+Plant -> TCU : SIM_Analog: OilTempVoltage (-7 degC), first reception
+TCU -> TCU : at start-up oil temperature <= -5 degC -> 4th inhibited (SYS-SFT-008)
+note right of TCU: ASSUMPTION: the start-up check uses the first received\noil temperature, not the substitute value 80 degC\n(open question N-07 in system_design.md)
+note over Plant, TCU: D, accelerating
+TCU -> TCU : schedule gives 4th, inhibited -> 3rd kept, 4th not commanded
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (3rd)
+
+== warm-up ==
+Plant -> Plant : slow warm-up while driving (SIM-PLT-007)
+Plant -> TCU : SIM_Analog: oil temperature above -5 degC
+TCU -> TCU : inhibit released (SYS-SFT-008)
+... >= 2000 ms after the previous shift (SYS-SFT-004) ...
+TCU -> Plant : TCU_Actuators: SS_A = ON, SS_B = OFF (shift 3 -> 4)
+
+== oil temperature falls below -10 degC in 4th ==
+User -> Console : force OilTempVoltage (SIM-CON-003)
+Plant -> TCU : SIM_Analog: oil temperature below -10 degC
+TCU -> TCU : inhibit active while 4th is commanded -> downshift to 3rd (SYS-SFT-008)
+alt prediction for 3rd <= 6000 rpm (SYS-SFT-005) and SYS-SFT-004 elapsed
+  TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (shift 4 -> 3)
+  Plant -> Plant : ratio 0.70 -> 1.00 over 400 ms (SIM-PLT-003)
+else prediction for 3rd > 6000 rpm
+  TCU -> TCU : downshift refused, 4th kept (SYS-SFT-008 note: SYS-SFT-005 takes priority)
+  TCU -> Plant : TCU_Actuators: SS_A = ON, SS_B = OFF (4th)
+end
+note over Plant, TCU: the inhibit is released again only above -5 degC (hysteresis -10 / -5 degC)
+@enduml

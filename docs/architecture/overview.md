@@ -6,6 +6,9 @@ R21-11, single core.
 The required behaviour, the system context (TCU, CAN gateway, plant model on the host) and
 the CAN matrix are specified in [`docs/specs/`](../specs/README.md).
 
+System design (elements, interfaces, requirement allocation, scenario diagrams):
+[`system/system_design.md`](system/system_design.md).
+
 ## Layers
 
 ```

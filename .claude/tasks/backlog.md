@@ -33,4 +33,4 @@ MCAL tasks implement their AUTOSAR SWS.
 | TASK-023 | PBL (`src/boot/pbl`) | boot | TASK-012, TASK-022 | TODO |
 | TASK-024 | SBL (`src/boot/sbl`) | boot | TASK-023 | TODO |
 | TASK-025 | `Dem` and `Dcm` services `14` / `19` (`SYS-FLT-007`; until then faults only in `TCU_Status.FaultBits`) | bsw/services | TASK-018, TASK-021 | TODO |
-| TASK-026 | System design: component and sequence diagrams for all approved system scenarios (PlantUML, `docs/architecture/system/`) | docs | — | TODO |
+| TASK-026 | System design: component and sequence diagrams for all approved system scenarios (PlantUML, `docs/architecture/system/`) | docs | — | DONE |

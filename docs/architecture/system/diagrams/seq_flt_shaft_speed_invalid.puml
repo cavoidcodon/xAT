@@ -1,0 +1,39 @@
+@startuml seq_flt_shaft_speed_invalid
+title SC-FLT-02 - Shaft speed above 8000 rpm: invalid, limp-home, reverse locked out
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-SEN-002, SYS-SEN-001, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-SEL-004, SYS-HMI-001,
+SIM-CON-003, SG-01, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, mode Normal
+User -> Console : inject a shaft speed offset (SIM-CON-003)
+Console -> Plant : OutputShaftSpeed offset
+Plant -> TCU : SIM_Speed: OutputShaftSpeed > 8000 rpm (t0)
+TCU -> TCU : value invalid (> 8000 rpm, can_matrix section 3.2): shaft speed invalid fault\n(FaultBits 6, DTC P0715-29) on the first invalid value, no debounce (SYS-SEN-002)
+TCU -> TCU : vehicle speed invalid (computed from OutputShaftSpeed, SYS-SEN-001)
+TCU -> TCU : enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON, RLS = OFF
+note right of TCU: <= t0 + 100 ms (SYS-FLT-003)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), VehicleSpeed = 0xFFFF (invalid), FaultBits bit 6 = 1
+
+opt R selected and RLS = ON before the fault
+  TCU -> TCU : vehicle speed invalid -> RLS = OFF, also when RLS was ON (SYS-SEL-004)
+  Plant -> Plant : RLS = OFF: reverse released, neutral
+  note over Plant, TCU: Safe state of SG-01: reverse locked out.
+end
+
+note over TCU: an InputShaftSpeed > 8000 rpm sets the same fault;\nthe vehicle speed then stays valid
+
+User -> Console : remove the injection
+Plant -> TCU : SIM_Speed: OutputShaftSpeed <= 8000 rpm
+TCU -> TCU : the fault stays set until the next power cycle (SYS-FLT-008),\nlimp-home stays latched (SYS-FLT-004)
+@enduml

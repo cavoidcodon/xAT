@@ -1,0 +1,62 @@
+@startuml seq_dia_sessions
+title SC-DIA-01 - Diagnostic sessions, tester present and S3 timeout (application)
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over Tester, TCU
+Covers: SYS-DIA-001, SYS-DIA-002, SYS-DIA-003, SYS-COM-005, SYS-FLT-007, SIM-TST-003, SIM-TST-004
+UDS over ISO-TP: requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9, 3E 80 on DIAG_FuncReq 0x7DF;
+padding 0xCC, flow control BS = 0, STmin = 0 ms, N_Bs / N_Cr 1000 ms (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, default session after reset
+Tester -> TCU : 22 F1 86
+TCU --> Tester : 62 F1 86 01
+note right: default session
+
+== extended session ==
+Tester -> TCU : 10 03
+TCU --> Tester : 50 03 00 32 01 F4
+note right: P2 = 50 ms (00 32), P2* = 5000 ms in 10 ms units (01 F4)\n(reprogramming section 12)
+Tester -> TCU : 22 F1 86
+TCU --> Tester : 62 F1 86 03
+
+Tester -> TCU : 3E 00
+TCU --> Tester : 7E 00
+loop every 2 s while the tester keeps the session
+  Tester -> TCU : 3E 80 (functional 0x7DF, no response)
+  TCU -> TCU : S3 timer restarted
+end
+
+== return to the default session ==
+Tester -> TCU : 10 01
+TCU --> Tester : 50 01 00 32 01 F4
+Tester -> TCU : 22 F1 86
+TCU --> Tester : 62 F1 86 01
+
+== S3 timeout with 28 and 85 active ==
+Tester -> TCU : 10 03
+TCU --> Tester : 50 03 00 32 01 F4
+Tester -> TCU : 85 02
+TCU --> Tester : C5 02
+note right: DTC setting off (SYS-FLT-007)
+Tester -> TCU : 28 01 01
+TCU --> Tester : 68 01
+note right: TCU_Actuators / TCU_Status stopped (SYS-COM-005, SC-COM-03)
+Plant -> Plant : hydraulic default after 50 ms (SIM-PLT-004)
+... no request for S3 = 5000 ms (tester stopped) ...
+TCU -> TCU : back to the default session; 28 and 85 undone (SYS-DIA-003)
+TCU -> Plant : TCU_Actuators every 10 ms, TCU_Status every 100 ms
+TCU -> TCU : DTC status bits updated again
+Tester -> TCU : 22 F1 86
+TCU --> Tester : 62 F1 86 01
+
+note over Tester, TCU
+14, 19 01 / 19 02, 22, 3E, 10 and 11 01 are available in the default and extended sessions;
+27 01 / 02, 28, 31 01 02 03 and 85 only in the extended session (reprogramming section 3).
+Whether 10 01 also undoes active 28 / 85 is not stated (open question N-08 in system_design.md).
+end note
+@enduml

@@ -1,0 +1,56 @@
+@startuml seq_sft_downshifts_kickdown
+title SC-SFT-04 - Downshifts with hysteresis and kick-down as single steps
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SFT-001, SYS-SFT-002, SYS-SFT-003, SYS-SFT-004, SYS-SFT-005, SYS-SFT-007, SYS-ACT-001
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: D in 4th, mode Normal
+note over Plant, TCU
+Every downshift is checked against the 6000 rpm limit before it starts (SYS-SFT-005):
+prediction = max(OutputShaftSpeed x ratio of the new gear,
+InputShaftSpeed x ratio of the new gear / ratio of the current gear); refused case in SC-SFT-05.
+end note
+
+alt coast-down (throttle released)
+  User -> Console : release the throttle
+  Console -> Plant : Throttle = 0 %
+  loop every 10 ms
+    Plant -> TCU : SIM_Driver: Throttle = 0 %; SIM_Speed: speeds falling
+  end
+  TCU -> TCU : vehicle speed below the 4 -> 3 downshift speed (SYS-SFT-001)
+  note right of TCU: the downshift speed n+1 -> n is at least 5 km/h below\nthe upshift speed n -> n+1 for every throttle position\n(SYS-SFT-002, property of the calibration tables, RV)
+  TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (3rd), shift pressure profile
+  Plant -> Plant : ratio 0.70 -> 1.00 over 400 ms (SIM-PLT-003)
+  TCU -> TCU : shift complete (SYS-SFT-007)
+  opt vehicle speed oscillates between the 4 -> 3 downshift speed and the 3 -> 4 upshift speed
+    TCU -> TCU : 3rd kept, no shift hunting (SYS-SFT-002)
+  end
+  ... >= 2000 ms after completion (SYS-SFT-004) ...
+  TCU -> TCU : vehicle speed below the 3 -> 2 downshift speed
+  TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = ON (2nd)
+else kick-down (throttle to 100 %)
+  User -> Console : throttle 100 %
+  Console -> Plant : Throttle = 100 %
+  Plant -> TCU : SIM_Driver: Throttle = 100 % (raw 200)
+  TCU -> TCU : downshift table gives target gear 2 (SYS-SFT-001)
+  TCU -> TCU : one step at a time: shift 4 -> 3 first (SYS-SFT-003)
+  TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (3rd), shift pressure profile
+  TCU -> Plant : TCU_Status: GearTarget = 3, ShiftInProgress = 1
+  Plant -> Plant : ratio 0.70 -> 1.00 over 400 ms
+  ... ratio within +/- 5 % of 1.00 for 100 ms ...
+  TCU -> TCU : t1: shift 4 -> 3 complete (SYS-SFT-007)
+  ... >= 2000 ms after t1 (SYS-SFT-004) ...
+  TCU -> TCU : target still 2: shift 3 -> 2 if the prediction is <= 6000 rpm (SYS-SFT-005)
+  TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = ON (2nd), shift pressure profile
+  TCU -> Plant : TCU_Status: GearTarget = 2, ShiftInProgress = 1
+  Plant -> Plant : ratio 1.00 -> 1.63 over 400 ms
+  TCU -> TCU : shift 3 -> 2 complete
+end
+@enduml

@@ -1,0 +1,42 @@
+@startuml seq_boot_window_recovery
+title SC-BOOT-07 - Recovery through the boot window
+
+participant "UDS tester" as Tester
+box "TCU"
+participant "Application" as App
+participant "PBL" as PBL
+end box
+
+note over Tester, PBL
+Covers: SYS-BOOT-011, SYS-BOOT-001, SYS-BOOT-005, SYS-BOOT-008, SIM-TST-002
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over App: valid application that faults or resets at start-up\nand never processes 10 02 (SYS-BOOT-011 rationale)
+
+loop every 5 ms until the PBL answers (reprogramming section 9)
+  Tester -> PBL : 10 02
+end
+note right of Tester: the tester starts sending first,\nthen resets the ECU (reprogramming section 9)
+
+alt application still answers
+  Tester -> App : 11 01
+  App --> Tester : 51 01
+else application does not answer
+  note over App, PBL: ECU power cycle
+end
+
+== reset ==
+PBL -> PBL : application check valid (SYS-BOOT-001)
+PBL -> PBL : boot window: listen for 10 02 on 0x7E1 for 50 ms (SYS-BOOT-011)
+PBL -> PBL : 10 02 received within the window
+PBL --> Tester : 50 02 00 32 01 F4
+note right of PBL: programming session; the application is not started;\nno TCU_Actuators / TCU_Status (SYS-BOOT-008)
+note over PBL: the PBL does not check the vehicle speed in the window\n(SYS-BOOT-011 note); security access is still required (SYS-BOOT-005)
+Tester -> PBL : continue with step 6 (27 11), SC-BOOT-01
+
+opt application resets in a loop
+  note over App, PBL: every reset opens a new 50 ms boot window;\nthe 10 02 sent every 5 ms is received in one of them
+end
+@enduml

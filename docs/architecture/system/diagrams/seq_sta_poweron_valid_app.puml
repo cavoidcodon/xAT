@@ -1,0 +1,71 @@
+@startuml seq_sta_poweron_valid_app
+title SC-STA-01 - Power-on with a valid application, no tester
+
+participant "Plant model" as Plant
+box "TCU"
+participant "PBL" as PBL
+participant "Application" as App
+end box
+participant "Red LED\n(TCU board)" as LED
+
+note over Plant, LED
+Covers: SYS-BOOT-001, SYS-BOOT-011, SYS-BOOT-013, SYS-BOOT-008, SYS-ACT-004, SYS-STA-001,
+SYS-SEL-001, SYS-COM-002, SYS-COM-004, SYS-TIM-001, SYS-FLT-001, SYS-FLT-002, SYS-HMI-001,
+SIM-PLT-001, SIM-PLT-004
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+== t0: reset (power-on) ==
+
+loop every 10 ms, from before the reset and during the whole scenario (SIM-PLT-001)
+  Plant -> PBL : SIM_Driver (0x100), SIM_Speed (0x101), SIM_Analog (0x102), AliveCtr +1 per frame
+  note right: the PBL does not use plant signals (SYS-BOOT-011 note)
+end
+
+PBL -> PBL : application check (SYS-BOOT-001, reprogramming section 9 row 1):\nheader magic 0x41544178, header_crc32, hw_id 0x0947_0001,\nmin_pbl_version <= PBL version, image CRC32 -> valid
+note right of PBL: completes without a processor fault\nalso for an erased or partial area (SYS-BOOT-013)
+PBL -> PBL : boot window: listen for 10 02 on 0x7E1 (SYS-BOOT-011)
+... 50 ms, no 10 02 received ...
+PBL -> PBL : de-initialize CAN and clocks, set the vector table\n(reprogramming section 9 row 3)
+PBL -> App : jump to the application
+note over PBL: no TCU_Actuators / TCU_Status from the PBL (SYS-BOOT-008)
+
+== Init: from reset until control is active ==
+
+note over App
+no TCU_Actuators (SYS-ACT-004) and no TCU_Status (SYS-COM-004 note)
+selector position = N until the first position is accepted (SYS-SEL-001)
+substitute values (can_matrix section 6) until the first reception of each message;
+reception timeouts (30 ms) are monitored from the application start (SYS-COM-002)
+end note
+
+Plant -> Plant : TCU_Actuators not received for 50 ms (t0 + 50 ms):\nhydraulic default SS_A = SS_B = OFF, PCS_Duty = 0 %, RLS = OFF,\nSLS = OFF, FaultLamp = OFF (SIM-PLT-004)
+note right of Plant: 3rd gear in D, maximum line pressure,\nreverse locked out, selector locked in P\n(system_context section 4 item 3)
+
+alt plant model running
+  Plant -> App : SIM_Driver: Selector = 0 (P), Brake, Throttle; SIM_Speed; SIM_Analog
+  App -> App : first reception replaces the substitute values (SYS-COM-002)
+  ... Selector = 0 (P) received unchanged for 50 ms ...
+  App -> App : P accepted (SYS-SEL-001); control active, mode Normal
+  App -> Plant : TCU_Actuators (0x200): SS_A = ON, SS_B = ON (1st prepared, SYS-SEL-005),\nPCS_Duty from the table (SYS-ACT-002), RLS = OFF, SLS per SYS-SEL-003, FaultLamp = OFF
+else no message of the plant model received
+  ... 30 ms after the application start ...
+  App -> App : communication faults SIM_Driver, SIM_Speed, SIM_Analog\n(FaultBits 7, 8, 9) (SYS-COM-002) -> enter limp-home (SYS-FLT-002)
+  App -> App : control active with the limp-home outputs (SYS-STA-001 note)
+  App -> Plant : TCU_Actuators (0x200): SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %,\nFaultLamp = ON, RLS = OFF, SLS = OFF (SYS-FLT-001)
+  App -> LED : ON (SYS-HMI-001)
+end
+note over PBL, App: control active <= 500 ms after t0, including the PBL check (SYS-STA-001)
+
+== control active ==
+
+loop every 10 ms (+/- 1 ms) (SYS-TIM-001, SYS-COM-004)
+  Plant -> App : SIM_Driver, SIM_Speed, SIM_Analog
+  App -> App : sensor inputs, selector logic, shift control,\nactuator commands, fault detection (SYS-TIM-001)
+  App -> Plant : TCU_Actuators (0x200)
+end
+loop every 100 ms (+/- 1 ms) (SYS-TIM-001, SYS-COM-004)
+  App -> Plant : TCU_Status (0x201): GearActual, GearTarget, Mode,\nSelectorState, VehicleSpeed, FaultBits, OilTemp
+end
+Plant -> Plant : uses TCU_Actuators again (SIM-PLT-004 no longer active)
+@enduml

@@ -1,0 +1,44 @@
+@startuml seq_flt_limp_home_entry
+title SC-FLT-01 - Limp-home entry (any fault of SYS-FLT-002)
+
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over Plant, LED
+Covers: SYS-FLT-001, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-HMI-001, SYS-SEL-003, SYS-SEL-004,
+SYS-SFT-004, SYS-SFT-005, SIM-PLT-002, SIM-PLT-007, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, mode Normal, D in any gear
+TCU -> TCU : t0: a fault of SYS-FLT-002 is set
+note right of TCU
+shift fault (SC-SFT-06), ratio fault (SC-FLT-05),
+pressure fault (SC-FLT-06), line pressure sensor fault (SC-FLT-04),
+shaft speed invalid (SC-FLT-02), selector fault while D is selected (SC-SEL-02),
+communication fault SIM_Driver / SIM_Speed / SIM_Analog (SC-COM-01, SC-COM-02),
+bus-off not recovered (SC-COM-04)
+end note
+TCU -> TCU : enter limp-home (SYS-FLT-002), latched (SYS-FLT-004)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
+note right of TCU: <= t0 + 100 ms (SYS-FLT-003); not delayed by SYS-SFT-004\nand not limited by SYS-SFT-005 (SYS-FLT-001 note);\nbus-off: outputs when the bus is back (SC-COM-04)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit of the fault = 1, GearTarget = 3
+Plant -> Plant : D: 3rd gear from SS_A = SS_B = OFF (SIM-PLT-002),\nline pressure maximum (20 bar at 0 %, SIM-PLT-007)
+note over Plant, TCU: Safe state of SG-04: 3rd in D, maximum line pressure, fault lamp ON.
+
+group interlocks stay active in limp-home (SYS-FLT-001)
+  Plant -> TCU : SIM_Driver: Selector = 0 (P), Brake = 1; standstill
+  TCU -> Plant : TCU_Actuators: SLS = ON (SYS-SEL-003)
+  Plant -> TCU : SIM_Driver: Selector = 1 (R); vehicle speed valid and < 2 km/h
+  TCU -> Plant : TCU_Actuators: RLS = ON (SYS-SEL-004), PCS_Duty = 0 %
+end
+
+... the fault condition disappears ...
+TCU -> TCU : limp-home stays (SYS-FLT-004); the fault bit stays set until the next\npower cycle (SYS-FLT-008); only the selector fault clears (SC-SEL-02)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON
+
+== power cycle ==
+TCU -> TCU : reset: limp-home and fault bits cleared, start-up as SC-STA-01
+@enduml
