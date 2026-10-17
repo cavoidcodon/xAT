@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | CAN bus between the TCU and the plant model (via the gateway) |
 | Parent   | `system_requirements.md` (`SYS-COM`, `SYS-DIA`) |
-| Version  | 1.0   |
+| Version  | 1.1   |
 | Status   | Approved |
 
 This document is the **single source** for CAN identifiers, layouts and scaling
@@ -104,21 +104,27 @@ Speeds are unsigned: in reverse the plant sends the magnitude.
 
 Bit numbers refer to the signal value (bit 0 = least significant bit, located in byte 5).
 
-| Bit | Fault | Requirement |
-|---|---|---|
-| 0 | selector fault | SYS-SEL-002 |
-| 1 | shift fault | SYS-SFT-007 |
-| 2 | ratio fault | SYS-SEN-005 |
-| 3 | pressure fault | SYS-SEN-006 |
-| 4 | line pressure sensor fault | SYS-SEN-004 |
-| 5 | oil temperature sensor fault | SYS-SEN-004 |
-| 6 | shaft speed invalid | SYS-SEN-002 |
-| 7 | communication fault `SIM_Driver` | SYS-COM-002 |
-| 8 | communication fault `SIM_Speed` | SYS-COM-002 |
-| 9 | communication fault `SIM_Analog` | SYS-COM-002 |
-| 10 | bus-off | SYS-COM-006 |
-| 11 | oil overtemperature | SYS-FLT-006 |
-| 12 .. 15 | reserved (0) | - |
+DTCs (`SYS-FLT-007`) use DTCFormatIdentifier 0x00 (ISO 15031-6 / SAE J2012: two-byte DTC
+plus failure type byte). Generic SAE codes are used where one matches; `U11xx` are
+project-specific codes named after the CAN ID of the lost message. Failure type bytes:
+`1C` voltage out of range, `29` signal invalid, `64` signal plausibility failure,
+`87` missing message, `88` bus off, `00` no sub-type. P0715 stands for both shaft speeds.
+
+| Bit | Fault | Requirement | DTC | Bytes |
+|---|---|---|---|---|
+| 0 | selector fault | SYS-SEL-002 | P0705-29 | 07 05 29 |
+| 1 | shift fault | SYS-SFT-007 | P0780-00 | 07 80 00 |
+| 2 | ratio fault | SYS-SEN-005 | P0730-00 | 07 30 00 |
+| 3 | pressure fault | SYS-SEN-006 | P0840-64 | 08 40 64 |
+| 4 | line pressure sensor fault | SYS-SEN-004 | P0840-1C | 08 40 1C |
+| 5 | oil temperature sensor fault | SYS-SEN-004 | P0710-1C | 07 10 1C |
+| 6 | shaft speed invalid | SYS-SEN-002 | P0715-29 | 07 15 29 |
+| 7 | communication fault `SIM_Driver` | SYS-COM-002 | U1100-87 | D1 00 87 |
+| 8 | communication fault `SIM_Speed` | SYS-COM-002 | U1101-87 | D1 01 87 |
+| 9 | communication fault `SIM_Analog` | SYS-COM-002 | U1102-87 | D1 02 87 |
+| 10 | bus-off | SYS-COM-006 | U0001-88 | C0 01 88 |
+| 11 | oil overtemperature | SYS-FLT-006 | P0218-00 | 02 18 00 |
+| 12 .. 15 | reserved (0) | - | - | - |
 
 ## 4. Sensor characteristics
 

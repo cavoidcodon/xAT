@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | TCU (FRDM-MCXN947) as a black box |
 | Parent   | `safety_goals.md`, `system_context.md` |
-| Version  | 0.1   |
+| Version  | 0.2   |
 | Status   | Approved |
 
 ## 1. Purpose and scope
@@ -424,11 +424,11 @@ Note: overtemperature is a warning only; it does not limit the gear or the line 
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall store every fault of this document as a DTC with its status, readable with UDS `19` and clearable with UDS `14`. |
-| Rationale    | Diagnostics after the event. |
+| Statement    | The TCU shall keep one DTC per fault of `can_matrix.md` section 3.6 with the status bits testFailed (bit 0: the fault is currently set) and confirmedDTC (bit 3: the fault has been set since the last clear), report them with UDS `19 01` and `19 02` (status availability mask 0x09) and clear them with UDS `14 FF FF FF`. The DTC memory is volatile: it is cleared by a power cycle. While DTC setting is off (`85 02`), the status bits are not updated. `14` does not change the mode, the fault bits or the outputs; a fault that is still present sets its DTC again. |
+| Rationale    | Diagnostics after the event. Volatile because only the SBL may write flash (DC-04, `SYS-BOOT-004`) and the application has no non-volatile memory. Clearing DTCs must not leave limp-home (`SYS-FLT-004`). |
 | Parent       | - |
-| Verification | TT - tester reads DTCs after a fault injection |
-| Priority     | Could |
+| Verification | TT - tester reads DTCs after a fault injection, clears them, and reads them again with the fault still present and after it has gone |
+| Priority     | Should |
 | Status       | Approved |
 
 Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.FaultBits`.
@@ -590,7 +590,7 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The application shall support the services `10` (sessions 01, 02, 03), `11` (01), `22`, `27`, `28`, `31`, `3E` and `85`, with the sessions and security levels of `reprogramming.md` section 3. |
+| Statement    | The application shall support the services `10` (sessions 01, 02, 03), `11` (01), `14`, `19` (01, 02), `22`, `27`, `28`, `31`, `3E` and `85`, with the sessions and security levels of `reprogramming.md` section 3. `14` and `19` are available in the default and extended sessions without security access (`SYS-FLT-007`). |
 | Rationale    | Diagnostic access and entry into programming. |
 | Parent       | - |
 | Verification | TT - tester script per service, including negative responses |
@@ -728,8 +728,8 @@ programming request is stored in no-init RAM.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | In the programming session, when no request is received for S3 = 5000 ms and the application is valid, the bootloader shall reset the MCU. |
-| Rationale    | Return to the application when the tester disappears before erasing. |
+| Statement    | In the programming session, when no request is received for S3 = 5000 ms, the bootloader shall reset the MCU. |
+| Rationale    | Leave the programming session when the tester disappears. After the reset the PBL starts a valid application (`SYS-BOOT-001`) or stays in the default session (`SYS-BOOT-002`); the reset also discards the SBL in RAM and the unlocked security state. |
 | Parent       | - |
 | Verification | TT |
 | Priority     | Must |
@@ -815,3 +815,6 @@ PBL responds `50 02` (`reprogramming.md` section 9).
 | 3 | Overtemperature: warning only, or also limit gear / pressure? | SYS-FLT-006 | Warning only. Closed (user, 2026-10-17). |
 | 4 | All `[NC: ...]` values: confirm or change | all | All values confirmed as proposed. Closed (user, 2026-10-17). |
 | 5 | MCXN947 reference manual not available: RAM content after reset, ROM RAM usage and erased-flash read behaviour are unknown. Decision (user, 2026-10-04): no board experiment; use the robust design `SYS-BOOT-011`, `-013`; no state is kept in RAM across a reset (`SYS-BOOT-003` and `-012` deleted, user, 2026-10-17). | SYS-BOOT | closed |
+| 6 | `SYS-FLT-007` needs `19` / `14`, but `SYS-DIA-002` did not list them | SYS-FLT-007, SYS-DIA-002 | Add `14`, `19 01` / `19 02` to `SYS-DIA-002`; one DTC per fault bit (`can_matrix.md` 3.6); volatile DTC memory; `14` does not leave limp-home. Closed (user, 2026-10-17). |
+| 7 | `SYS-BOOT-009`: behaviour on S3 timeout when the application is invalid | SYS-BOOT-009 | Always reset; the PBL start-up decision then applies. Closed (user, 2026-10-17). |
+| 8 | `SYS-FLT-007` was `Could` while its services are in the `Must` requirement `SYS-DIA-002` | SYS-FLT-007 | Priority raised to `Should`. Closed (user, 2026-10-17). |

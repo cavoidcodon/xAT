@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | Plant model, console and UDS tester on the Pi5; CAN gateway on the FRDM-MCXN236 |
 | Parent   | `../system/system_context.md`, `../system/can_matrix.md`, `../system/reprogramming.md` |
-| Version  | 0.1   |
+| Version  | 0.2   |
 | Status   | Approved |
 
 ## 1. Purpose and scope
@@ -211,9 +211,9 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The tester shall read all DIDs of `reprogramming.md` section 4, change sessions, send tester present, and log every request and response with timestamps. |
+| Statement    | The tester shall read all DIDs of `reprogramming.md` section 4, read and clear DTCs (`19 01`, `19 02`, `14 FF FF FF`) and show them with the names of `can_matrix.md` section 3.6, change sessions, send tester present, and log every request and response with timestamps. |
 | Rationale    | General diagnostics. |
-| Parent       | SYS-DIA-002, SYS-DIA-005 |
+| Parent       | SYS-DIA-002, SYS-DIA-005, SYS-FLT-007 |
 | Verification | TT |
 | Priority     | Must |
 | Status       | Approved |

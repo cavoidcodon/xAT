@@ -347,3 +347,29 @@ with a grep script).
 ### Verification
 
 Documentation and Claude configuration only; no build or test needed.
+
+## 2026-10-17: Spec findings before the system design (spec update)
+
+### Summary
+
+Findings from preparing TASK-026 (system design), resolved with the user:
+
+- `system_requirements.md` (v0.2):
+  - SYS-FLT-007: one DTC per fault bit, status bits testFailed / confirmedDTC, `19 01` /
+    `19 02` / `14 FF FF FF`, volatile DTC memory (the application cannot write flash,
+    DC-04), `14` does not leave limp-home; priority `Could` -> `Should`.
+  - SYS-DIA-002: `14` and `19` (01, 02) added, default and extended session, no security.
+  - SYS-BOOT-009: the bootloader always resets on S3 timeout in the programming session;
+    the PBL start-up decision then applies.
+  - Open questions 6 .. 8 added and closed.
+- `can_matrix.md` (v1.1): DTC column in the `FaultBits` table (section 3.6).
+- `sim_requirements.md` (v0.2): SIM-TST-003 reads and clears DTCs.
+- `traceability.md` (v0.2): section 3 no longer cites the deleted SYS-BOOT-003 / -012;
+  SIM-TST-003 supports SYS-FLT-007.
+- `backlog.md`: new TASK-026 (system design, PlantUML); TASK-018 depends on it; TASK-025
+  also covers the `Dcm` services `14` / `19` and depends on TASK-021.
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).

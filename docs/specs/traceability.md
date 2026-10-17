@@ -2,7 +2,7 @@
 
 | Field    | Value |
 |----------|-------|
-| Version  | 0.1   |
+| Version  | 0.2   |
 | Status   | Approved |
 
 ## 1. Safety goals -> system requirements
@@ -31,6 +31,6 @@ Filled when the SWC specifications (`software/`) and module tasks are written.
 | SIM-PLT-004 | SYS-ACT-004, SYS-BOOT-008, SYS-STA-002 |
 | SIM-PLT-005 | SYS-SEL-003 |
 | SIM-CON-003 | SYS-SEL-002, SYS-SEN-004 .. SYS-SEN-006, SYS-SFT-007, SYS-COM-002, SYS-COM-003, SYS-FLT-* |
-| SIM-TST-001 | SYS-BOOT-001 .. SYS-BOOT-010 |
-| SIM-TST-002 | SYS-DIA-004, SYS-BOOT-005 .. SYS-BOOT-007, SYS-BOOT-011 .. SYS-BOOT-013 |
-| SIM-TST-003 | SYS-DIA-002, SYS-DIA-003, SYS-DIA-005 |
+| SIM-TST-001 | SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-004 .. SYS-BOOT-011, SYS-BOOT-014 |
+| SIM-TST-002 | SYS-DIA-004, SYS-BOOT-005 .. SYS-BOOT-007, SYS-BOOT-011, SYS-BOOT-013 |
+| SIM-TST-003 | SYS-DIA-002, SYS-DIA-003, SYS-DIA-005, SYS-FLT-007 |
