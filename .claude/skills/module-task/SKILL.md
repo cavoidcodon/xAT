@@ -8,7 +8,7 @@ description: Run one xAT task file (.claude/tasks/TASK-xxx.md) end to end with t
 Follow the workflow in `CLAUDE.md`. Steps:
 
 1. **Read.** Read the task file, `CLAUDE.md`, the rules in `.claude/rules/` that apply, and
-   `docs/modules/<Ma>.md` and `docs/architecture/overview.md` if they exist. Read the
+   `docs/modules/<Ma>/design.md` and `docs/architecture/overview.md` if they exist. Read the
    relevant SWS sections in `docs/references/autosar/`.
 2. **Investigate.** Use read-only actions only: inspect the existing code, the
    dependencies' headers, and the NXP SDK driver API (for MCAL).
@@ -28,7 +28,7 @@ Follow the workflow in `CLAUDE.md`. Steps:
 8. **Review.** Review `git diff`: layering, coding rules, no stray changes, no SDK
    changes.
 9. **Log.** Add an entry to `docs/development_log.md` (date, task, summary, decisions,
-   deviations, verification table). Update `docs/modules/<Ma>.md`,
+   deviations, verification table). Update `docs/modules/<Ma>/design.md`,
    `docs/autosar_compliance.md` (SWS -> code -> test), `docs/specs/traceability.md` §2
    (only when the task has a SYS / SWR parent) and the task status in `.claude/tasks/backlog.md`.
    The development log is not loaded automatically: if the task produced a decision that is

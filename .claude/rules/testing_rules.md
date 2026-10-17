@@ -19,7 +19,7 @@ tests/target/                              # on-board functional tests (later)
 
 Rules:
 - Every module has functional tests derived from its behaviour in the SWS and
-  in `docs/modules/<Ma>.md`. Test the behaviour, not the implementation details.
+  in `docs/modules/<Ma>/design.md`. Test the behaviour, not the implementation details.
 - Only the module under test is real. Every dependency (`Det`, `SchM`, other modules,
   NXP SDK functions) is a CMock mock generated from its header, or from the stub
   header in `tests/unit/stubs/sdk/`.

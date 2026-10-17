@@ -1,6 +1,6 @@
 ---
 name: new-module
-description: Scaffold a new AUTOSAR module (MCAL, BSW, OS, RTE or SWC) in xAT from the project templates - header, source, config, unit test and design doc. Use when starting work on a module that has no files yet. Args - "<Ma> <layer path>", e.g. "Dio mcal" or "IoHwAb bsw/ecual".
+description: Scaffold a new AUTOSAR module (MCAL, BSW, OS, RTE or SWC) in xAT from the project templates - header, source, config and unit test, following the module's reviewed design. Use when starting work on a module that has no files yet. Args - "<Ma> <layer path>", e.g. "Dio mcal" or "IoHwAb bsw/ecual".
 ---
 
 # Scaffold an AUTOSAR module
@@ -10,10 +10,16 @@ Input: module abbreviation `<Ma>` (exact BSW module list spelling, e.g. `Dio`, `
 
 1. Check that `src/<layer>/<Ma>/` has no source files yet (only `.gitkeep`). If it does,
    stop and tell the user.
+   For MCAL, BSW, OS and RTE modules, check that `docs/modules/<Ma>/design.md` exists (made
+   with the `module-design` skill and reviewed by the user). If it does not, stop and
+   suggest running `module-design` first: the scaffold follows the design's scope.
+   For SWCs, check that `docs/modules/<SwcName>/design.md` exists (made with the
+   `swc-design` skill and reviewed by the user); if not, suggest running `swc-design` first.
 2. Look up in the AUTOSAR R21-11 documents (`docs/references/autosar/`, or ask the user if
    they are missing):
    - the module ID (`AUTOSAR_TR_BSWModuleList`);
    - the SWS document name, the public API list with service IDs, and the DET error codes.
+   Scaffold only the APIs and containers listed as supported in `design.md`.
 3. Copy the templates from `templates/` and replace the placeholders:
 
    | Template | Destination |
@@ -23,7 +29,6 @@ Input: module abbreviation `<Ma>` (exact BSW module list spelling, e.g. `Dio`, `
    | `Module_Cfg.h` | `src/<layer>/<Ma>/config/<Ma>_Cfg.h` |
    | `Module_Cfg.c` | `src/<layer>/<Ma>/config/<Ma>_Cfg.c` |
    | `test_Module.c` | `tests/unit/<layer>/<Ma>/test_<Ma>.c` |
-   | `module_doc.md` | `docs/modules/<Ma>.md` |
 
    Placeholders: `<Ma>` (e.g. `Dio`), `<MA>` (e.g. `DIO`), `<MODULE_ID>`, `<SWS_DOC>`
    (e.g. `AUTOSAR_SWS_DIODriver`), `<LAYER>`.

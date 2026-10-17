@@ -100,7 +100,7 @@ tested and verified with the `verify` skill, with no further infrastructure work
    - `tests/unit/framework/`: a minimal self-test that mocks a dummy header with CMock.
      It proves that mock generation, expectations and failure detection work.
 7. Docs:
-   - `docs/modules/Platform.md` (from the `module_doc.md` template);
+   - `docs/modules/Platform/design.md` (from the `module-design` skill template);
    - `docs/unit_testing.md` (how to build and run the tests, and how to add a module
      test);
    - `docs/setup_host.md` (Ruby);
@@ -139,7 +139,7 @@ tested and verified with the `verify` skill, with no further infrastructure work
 | `tests/unit/CMakeLists.txt`, `tests/unit/cmock.yml` | add |
 | `tests/unit/platform/test_Platform_Types.c` (+ `CMakeLists.txt` if per-directory) | add |
 | `tests/unit/framework/test_CMock_Selftest.c`, `tests/unit/framework/dummy_dep.h` | add |
-| `docs/modules/Platform.md`, `docs/unit_testing.md` | add |
+| `docs/modules/Platform/design.md`, `docs/unit_testing.md` | add |
 | `docs/setup_host.md`, `docs/operations.md`, `docs/autosar_compliance.md`, `docs/development_log.md` | change |
 | `.claude/skills/verify/SKILL.md`, `.claude/tasks/backlog.md` | change |
 | `.gitkeep` in directories that get content | remove |
@@ -185,7 +185,7 @@ SWS IDs are taken from the R21-11 PDFs during planning and added to the complian
 2. **Ruby.** May `sudo apt install ruby` (Ubuntu 3.2) be run on the host?
 3. **Board port.** Reuse the SDK `hello_world` board port (`BOARD_InitHardware`: clocks,
    pins, debug console) until `Mcu`/`Port` take over? *Proposal: yes. Record it as a
-   temporary integration shortcut in `docs/modules/Platform.md` or the development log.*
+   temporary integration shortcut in `docs/modules/Platform/design.md` or the development log.*
 4. **Boot banner.** Is it OK for `src/ecu/main.c` (integration layer) to use the SDK debug
    console (`PRINTF`) for the banner? *Proposal: yes. The layering rules allow
    `src/ecu` to use the SDK.*

@@ -53,7 +53,7 @@ the skill's standard plan, or "-".
 | AC1 | Firmware builds without warnings | `ops build --clean` |
 | AC2 | Unit tests pass, every API covered | `ctest --test-dir build/unit` |
 | AC3 | No layering violation | `verify` skill step 3 |
-| AC4 | Docs updated (`docs/modules/<Ma>.md`, compliance matrix, development log) | review |
+| AC4 | Docs updated (`docs/modules/<Ma>/design.md`, compliance matrix, development log) | review |
 
 ## 7. Open questions
 

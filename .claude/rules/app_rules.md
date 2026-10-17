@@ -21,7 +21,7 @@ paths:
   `config/`, as `const` tables with units in their names or comments
   (`_rpm`, `_kph`, `_degC`, `_ms`).
 - Use fixed-point (scaled integer) arithmetic unless a SWC design doc explicitly
-  allows `float32`. Document scaling and ranges in `docs/modules/<SwcName>.md`.
+  allows `float32`. Document scaling and ranges in `docs/modules/<SwcName>/design.md`.
 - RTE files (`Rte.c`, `Rte_<Swc>.h`, `Rte_Type.h`) are handwritten, following
   `AUTOSAR_SWS_RTE` naming. Every port added must be listed in
   `docs/architecture/overview.md`.
