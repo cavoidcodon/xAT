@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | CAN bus between the TCU and the plant model (via the gateway) |
 | Parent   | `system_requirements.md` (`SYS-COM`, `SYS-DIA`) |
-| Version  | 1.2   |
+| Version  | 1.3   |
 | Status   | Approved |
 
 This document is the **single source** for CAN identifiers, layouts and scaling
@@ -93,11 +93,11 @@ Speeds are unsigned: in reverse the plant sends the magnitude.
 | GearActual | 3 | 4 | 0 = none / N, 1 .. 4, 5 = R | - | engaged gear as seen by the TCU; 15 = unknown |
 | GearTarget | 7 | 4 | same as GearActual | - | commanded gear |
 | Mode | 9 | 2 | 0 = Normal, 1 = Limp-home | - | - |
-| SelectorState | 12 | 3 | same as `SIM_Driver.Selector` | - | debounced position; 7 = invalid |
+| SelectorState | 12 | 3 | same as `SIM_Driver.Selector` | - | debounced position; 7 = invalid, sent while the selector fault (`SYS-SEL-002`) is set |
 | ShiftInProgress | 13 | 1 | 0 / 1 | - | - |
 | VehicleSpeed | 23 | 16 | 0.1 km/h/bit | 0 .. 2500 | 0xFFFF = invalid |
 | FaultBits | 39 | 16 | bit field, section 3.6 | - | - |
-| OilTemp | 55 | 8 | 1 degC/bit, offset -40 | 0 .. 190 (-40 .. 150 degC) | 0xFF = invalid |
+| OilTemp | 55 | 8 | 1 degC/bit, offset -40 | 0 .. 190 (-40 .. 150 degC) | 0xFF = invalid, sent while the substitute oil temperature (`SYS-FLT-005`, section 6) is used |
 | AliveCtr | 59 | 4 | - | 0 .. 15 | - |
 
 ### 3.6 `TCU_Status.FaultBits`
@@ -166,3 +166,7 @@ of the message (`SYS-COM-002`).
 Changed on 2026-10-17 (user, system design findings F-12, F-14, F-16): fault bits per
 timeout named; a `SIM_Analog` timeout now enters limp-home like a line pressure sensor fault
 (`SYS-FLT-002`); functional addressing only for `3E 80`.
+
+Changed on 2026-10-17 (user, system design findings N-02, N-03): `TCU_Status.SelectorState`
+is 7 while the selector fault is set; `TCU_Status.OilTemp` is 0xFF while the substitute oil
+temperature is used.

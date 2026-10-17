@@ -523,3 +523,44 @@ The checks of the script:
 4. every SG has a safe-state row whose scenarios name the SG;
 5. SIM coverage is complete, every open question referenced in a diagram is defined, and every
    `ASSUMPTION` is listed.
+
+## 2026-10-17: Spec findings N-01 .. N-11 from the system design (spec update)
+
+### Summary
+
+Findings recorded in `docs/architecture/system/system_design.md` section 10.2 while drawing
+the TASK-026 diagrams, resolved with the user:
+
+- `system_requirements.md` (v0.4):
+  - SYS-HMI-001 (N-01): FaultLamp / red LED ON while the selector fault is set.
+  - SYS-SEN-006 (N-04): pressure plausibility suspended while the line pressure sensor fault
+    or the `SIM_Analog` communication fault is set.
+  - SYS-COM-003 (N-05): the alive counter is compared with the last received message of the
+    same ID, ignored or not.
+  - SYS-FLT-003 (N-06): the bus-off exception covers every fault set while in bus-off,
+    including the communication faults; an outage > 30 ms enters limp-home through them.
+  - SYS-SFT-008 (N-07): "at startup" = first oil temperature received after reset.
+  - SYS-DIA-003 (N-08): every return to the default session (`10 01` or S3) undoes `28` / `85`.
+  - SYS-BOOT-007 (N-10): the next reset starts the unchanged previous application or ends in
+    the PBL default session, or starts the new application once it has been accepted. SYS-BOOT-015 restated: the SBL programs the application header
+    sector only after `0202` and `FF01` passed (header written last) instead of erasing it
+    after a failed check.
+  - SYS-SFT-006, SYS-SEL-005 (N-11): over the 6000 rpm limit, the lowest higher gear within the
+    limit.
+  - Open question 10 added and closed.
+- `can_matrix.md` (v1.3): `SelectorState` = 7 while the selector fault is set (N-02);
+  `OilTemp` = 0xFF while the substitute is used (N-03).
+- `reprogramming.md` (v0.5): step 18 programs the header sector before the positive response;
+  section 11 header-last rule (N-10); section 3 security lockout not kept across a reset,
+  accepted for v1 (N-09). Open question 6 added and closed.
+
+### Decisions (user)
+
+- N-01 lamp ON; N-06 extend the exception; N-09 accept the reset behaviour; N-10 header
+  written last (detailed design in TASK-024). The other findings as proposed.
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).
+

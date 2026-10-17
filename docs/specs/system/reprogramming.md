@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | Application -> PBL -> SBL hand-over, UDS sequence, memory map, image formats |
 | Parent   | `system_requirements.md` (`SYS-DIA`, `SYS-BOOT`) |
-| Version  | 0.4   |
+| Version  | 0.5   |
 | Status   | Approved |
 
 ## 1. Software parts
@@ -43,7 +43,7 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 | 15 | SBL | `36 <bsc> <data>` ... | `76 <bsc>` | |
 | 16 | SBL | `37` | `77` | |
 | 17 | SBL | `31 01 02 02 <crc32>` | `71 01 02 02 00` | checkMemory of the application |
-| 18 | SBL | `31 01 FF 01` | `71 01 FF 01 00` | checkProgrammingDependencies: header, HW id, versions |
+| 18 | SBL | `31 01 FF 01` | `71 01 FF 01 00` | checkProgrammingDependencies: header, HW id, versions; on success the SBL programs the application header sector, then responds (`SYS-BOOT-015`) |
 | 19 | SBL | `11 01` | `51 01` | reset; PBL checks the application (`SYS-BOOT-001`) and starts it |
 
 `3E 80` (tester present, no response) is sent every 2 s during the whole sequence.
@@ -88,9 +88,12 @@ unlocked):
   then reset, as for `11 01`; the PBL start-up decision (section 9) then applies.
 - Failed security access, both levels: after 3 failed `27` key attempts, the third one is
   answered with NRC `36` and every `27` within the next 10 s with NRC `37` (`SYS-BOOT-005`
-  for level 0x11, the same rule for level 0x01).
+  for level 0x11, the same rule for level 0x01). The failed-attempt counter and the delay are
+  not kept across a reset (no RAM content is kept, section 5); a reset gives 3 new attempts.
+  Accepted for the educational security of v1.
 
-Added on 2026-10-17 (user, system design findings F-06, F-17).
+Added on 2026-10-17 (user, system design findings F-06, F-17). Reset behaviour of the lockout
+added on 2026-10-17 (user, system design finding N-09).
 
 | Level | `27` sub-functions | Where | Unlocks |
 |---|---|---|---|
@@ -238,9 +241,15 @@ application still answers).
 | 0xFF01 | checkProgrammingDependencies | SBL | - | 0 = OK, 1 = header invalid, 2 = hw_id mismatch, 3 = PBL version too old |
 
 `min_pbl_version` and the PBL version (DID 0xF180) are compared as
-major << 16 | minor << 8 | patch. After a CRC mismatch of the application at `0202` or a
-failed `FF01`, the SBL erases the sector that holds the application header before it
-responds (`SYS-BOOT-015`).
+major << 16 | minor << 8 | patch.
+
+The application header sector (0x0001_4000 .. 0x0001_5FFF: header and the first 7 KiB of the
+image) is erased by `FF00` like the rest of the area, but the SBL programs it only after
+`0202` and `FF01` of the application have passed, just before the positive response to
+`FF01` (`SYS-BOOT-015`). Until then the PBL application check fails, so an interruption after
+the erase always ends in the PBL default session. The data of that sector received with `36`
+is kept in SBL RAM until then and is included in the `0202` CRC. Changed on 2026-10-17 (user,
+system design finding N-10); before, the SBL erased the header sector after a failed check.
 
 ### 11.1 Request sequence and address rules
 
@@ -279,3 +288,4 @@ Added on 2026-10-17 (user, system design finding F-05).
 | 3 | Seed source: TRNG or timer-based? | section 3 | Timer-based (section 3). Closed (user, 2026-10-17). |
 | 4 | Use the MCXN947 CRC engine or a software table CRC in the PBL? (start-up time `SYS-STA-001`) | SYS-BOOT-001 | CRC engine (`CRC0`, SDK driver `fsl_crc`): the polynomial, seed, input / output reflection and final complement are programmable, so it computes CRC-32/ISO-HDLC (poly 0x04C11DB7, seed 0xFFFF_FFFF, reflect in / out, complement). Used in the PBL and the SBL; the result must match `zlib.crc32` of the tester (unit test against a known vector). Closed (user, 2026-10-17). |
 | 5 | System design findings F-01, F-04 .. F-08, F-17 (TASK-026 plan): sub-function of `28`, rejected images, sequence and address rules, services per session, entry with an invalid application, application `50 02` vs. PBL `50 02`, security lockout of level 0x01 | sections 2, 3, 9, 11 | Step 4 is `28 01 01`; section 2 entry with an invalid application; section 3 services table; section 11 header invalidation and 11.1 sequence rules. Closed (user, 2026-10-17). |
+| 6 | System design findings N-09, N-10 (`docs/architecture/system/system_design.md` section 10.2): security lockout across a reset, application header written last | sections 2, 3, 11 | Lockout not kept across a reset (accepted, v1); the SBL programs the header sector after `0202` / `FF01` passed. Closed (user, 2026-10-17). |
