@@ -4,8 +4,8 @@
 |----------|-------|
 | Scope    | Application -> PBL -> SBL hand-over, UDS sequence, memory map, image formats |
 | Parent   | `system_requirements.md` (`SYS-DIA`, `SYS-BOOT`) |
-| Version  | 0.2   |
-| Status   | Draft |
+| Version  | 0.3   |
+| Status   | Approved |
 
 ## 1. Software parts
 
@@ -30,9 +30,9 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 | 2 | App | `31 01 02 03` | `71 01 02 03 00` | checkProgrammingPreconditions (`SYS-DIA-004`) |
 | 3 | App | `85 02` | `C5 02` | DTC setting off |
 | 4 | App | `28 03 01` | `68 03` | stop `TCU_Actuators` / `TCU_Status` (`SYS-COM-005`) |
-| 5 | App -> PBL | `10 02` | `50 02 ...` (sent by the PBL) | request stored in no-init RAM, reset (`SYS-BOOT-003`) |
+| 5 | App -> PBL | `10 02`, repeated every 5 ms after the first `50 02` | `50 02 ...` (sent by the app), then `50 02 ...` (sent by the PBL) | the app resets (`SYS-BOOT-014`); the PBL answers in the boot window (`SYS-BOOT-011`, section 9) |
 | 6 | PBL | `27 11` / `27 12 <key>` | `67 11 <seed>` / `67 12` | programming security level |
-| 7 | PBL | `34 00 44 <addr> <size>` | `74 20 <maxBlockLen>` | download SBL to RAM |
+| 7 | PBL | `34 00 44 0400_0000 <size>` | `74 20 <maxBlockLen>` | download SBL to the SBL load area in SRAMX (section 5) |
 | 8 | PBL | `36 <bsc> <data>` ... | `76 <bsc>` | |
 | 9 | PBL | `37` | `77` | |
 | 10 | PBL | `31 01 02 02 <crc32>` | `71 01 02 02 00` | checkMemory of the SBL |
@@ -46,7 +46,7 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 | 18 | SBL | `31 01 FF 01` | `71 01 FF 01 00` | checkProgrammingDependencies: header, HW id, versions |
 | 19 | SBL | `11 01` | `51 01` | reset; PBL checks the application (`SYS-BOOT-001`) and starts it |
 
-`3E 80` (tester present, no response) is sent every [NC: 2] s during the whole sequence.
+`3E 80` (tester present, no response) is sent every 2 s during the whole sequence.
 
 ## 3. Sessions and security
 
@@ -62,8 +62,11 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 | 0x11 | `27 11` / `27 12` | PBL, programming session | `34` / `36` / `37` / `31` in PBL; state handed to SBL |
 
 **Security algorithm v1 (educational, not secure):** 4-byte seed,
-`key = rotl32(seed, [NC: 7]) XOR [NC: 0x5A3C_C3A5]`. The constants live in the bootloader
+`key = rotl32(seed, 7) XOR 0x5A3C_C3A5`. The constants live in the bootloader
 `config/`. A real algorithm (e.g. CMAC or signature-based) is a later change.
+The seed is the value of a free-running 32-bit timer captured when the seed request
+arrives; a captured value of 0 is replaced by 1, because seed 0 means "already unlocked".
+The TRNG is not used.
 
 ## 4. Data identifiers
 
@@ -86,7 +89,7 @@ at 0x000C_0000 is not used.
 
 | Region | Start | End | Size | Erased / written by |
 |---|---|---|---|---|
-| PBL | 0x0000_0000 | 0x0000_FFFF | [NC: 64 KiB] | debugger only |
+| PBL | 0x0000_0000 | 0x0000_FFFF | 64 KiB | debugger only |
 | Boot info A | 0x0001_0000 | 0x0001_1FFF | 8 KiB | SBL |
 | Boot info B | 0x0001_2000 | 0x0001_3FFF | 8 KiB | SBL |
 | Application header | 0x0001_4000 | 0x0001_43FF | 1 KiB | SBL |
@@ -95,15 +98,25 @@ at 0x000C_0000 is not used.
 
 | RAM region | Address | Size | Use |
 |---|---|---|---|
-| SBL load area | [NEEDS CLARIFICATION: address] | [NC: 64 KiB] | SBL code and data |
-| No-init area | [NC: last 32 bytes of the PBL / App RAM region, same address in all three images] | [NC: 32 bytes] | RAM boot record (section 8) |
+| SBL load area (SRAMX) | 0x0400_0000 .. 0x0400_FFFF | 64 KiB | SBL image: vector table, code, initialized data |
+| SBL bss and stack (SRAMX) | 0x0401_0000 .. 0x0401_7FFF | 32 KiB | SBL zero-initialized data and stack |
+| PBL / application RAM | 0x2000_0000 .. 0x2006_7FFF | 416 KiB | data, bss, heap and stack of the PBL and of the application |
 
 Notes:
+- RAM layout from the SDK linker scripts: SRAMX (code bus) 0x0400_0000, 96 KiB, is the
+  SDK region for code executed from RAM (`MCXN947_cm33_core0_ram.ld`); system RAM
+  0x2000_0000 .. 0x2004_DFFF is core0 `m_data`, 0x2004_E000 .. 0x2006_7FFF is core1
+  `m_data` and is free on this single-core design.
+- The PBL uses only system RAM, so it can write the SBL into SRAMX with `36` without
+  touching its own data and stack. The SBL runs entirely from SRAMX (RB-04) and does not
+  use system RAM.
+- If data access to SRAMX over the code bus is too slow for the SBL, its bss and stack may
+  move to 0x2006_0000 .. 0x2006_7FFF; the PBL must then not use that range.
 - The application vector table is at 0x0001_4400, aligned to 1 KiB because the
   MCXN947 vector table is 0x400 bytes (SDK linker script `m_interrupts`).
-- The reference manual is not available, so it is **unknown** whether the boot ROM or a
-  reset clears the no-init area. The design does not depend on it: a lost RAM boot record
-  only disables the fast path (sections 8 and 9).
+- No RAM content is kept across a reset (no no-init area). The reference manual is not
+  available, so whether the boot ROM or a reset clears RAM is unknown; the design does not
+  depend on it.
 
 ## 6. Image header
 
@@ -117,7 +130,7 @@ another magic value. A post-build script fills `image_size`, `image_crc32` and
 | 0x04 | header_version | uint16 | 1 |
 | 0x06 | header_size | uint16 | 64 (bytes covered by `header_crc32`) |
 | 0x08 | sw_version | uint32 | major << 16 \| minor << 8 \| patch |
-| 0x0C | hw_id | uint32 | [NC: 0x0947_0001] (MCXN947 TCU); checked by `FF01` |
+| 0x0C | hw_id | uint32 | 0x0947_0001 (MCXN947 TCU); checked by `FF01` |
 | 0x10 | image_start | uint32 | address of the vector table (0x0001_4400) |
 | 0x14 | image_size | uint32 | bytes from `image_start` |
 | 0x18 | image_crc32 | uint32 | CRC-32/ISO-HDLC over `image_size` bytes |
@@ -143,22 +156,11 @@ writing keeps the previous record.
 The application validity is **not** stored here: the PBL checks the application header
 and CRC at every start (`SYS-BOOT-001`).
 
-## 8. RAM boot record (no-init RAM)
+## 8. RAM boot record (removed)
 
-Shared by the application, PBL and SBL at the same fixed address, placed in a `NOLOAD`
-linker section that the start-up code does not zero.
-
-| Field | Type | Notes |
-|---|---|---|
-| magic | uint32 | "xATR" (`0x52544178`) |
-| magic_inv | uint32 | bitwise inverse of `magic` |
-| request | uint8 | 0 = none, 1 = programming (`SYS-BOOT-003`) |
-| abnormal_resets | uint8 | consecutive abnormal resets (`SYS-BOOT-012`) |
-| reserved | uint8[2] | 0 |
-| crc32 | uint32 | CRC-32/ISO-HDLC over the fields above |
-
-The PBL treats the record as **absent** unless `magic`, `magic_inv` and `crc32` are all
-correct. An absent record is re-initialized with `request = 0`, `abnormal_resets = 0`.
+Removed on 2026-10-17 (user) together with `SYS-BOOT-003` and `SYS-BOOT-012`. No state is
+passed between the application, PBL and SBL in RAM. The section number is kept so that
+the later section numbers do not change.
 
 ## 9. PBL start-up decision
 
@@ -166,17 +168,14 @@ Evaluated once after every reset, in this order:
 
 | # | Condition | Action |
 |---|---|---|
-| 1 | Read `CMC->SRS`, clear the sticky flags (`CMC->SSRS`); read and validate the RAM boot record | - |
-| 2 | Record valid, `request = 1` **and** `SRS.SW = 1` | clear `request`, programming session, send `50 02` (`SYS-BOOT-003`) |
-| 3 | `SRS` reports WWDT0, LOCKUP or FATAL | `abnormal_resets` + 1, else set it to 0 (POR, PIN, SW, ...) |
-| 4 | `abnormal_resets` >= [NC: 3] | stay in the bootloader, default session (`SYS-BOOT-012`) |
-| 5 | Application check fails (section 10) | stay in the bootloader, default session (`SYS-BOOT-002`) |
-| 6 | Boot window [NC: 50] ms: `10 02` received on 0x7E1 | programming session, send `50 02` (`SYS-BOOT-011`) |
-| 7 | otherwise | de-initialize CAN and clocks used by the PBL, set VTOR, jump to the application |
+| 1 | Application check fails (section 10) | stay in the bootloader, default session (`SYS-BOOT-002`) |
+| 2 | Boot window 50 ms: `10 02` received on 0x7E1 | programming session, send `50 02` (`SYS-BOOT-011`) |
+| 3 | otherwise | de-initialize CAN and clocks used by the PBL, set VTOR, jump to the application |
 
-The tester's recovery procedure (used by `SIM-TST-002`): send `10 02` on 0x7E1 every
-[NC: 5] ms, then reset the ECU (power cycle, or `11 01` if the application still answers),
-until `50 02` arrives.
+The tester's entry procedure: send `10 02` on 0x7E1 every 5 ms until the PBL answers
+`50 02`. Normal entry: start after the application's `50 02` (`SYS-BOOT-014`). Recovery
+(used by `SIM-TST-002`): start, then reset the ECU (power cycle, or `11 01` if the
+application still answers).
 
 ## 10. Robustness rules
 
@@ -186,7 +185,7 @@ until `50 02` arrives.
 | RB-02 | The PBL application check sets `SYSCON->NVM_CTRL.DIS_MBECC_ERR_DATA = 1` while it reads the application, restores it afterwards, and checks the header (magic, `header_crc32`, `image_size` within the application area) before it reads the image. A BusFault / HardFault during the check is reported as "application invalid", not as a reset. | `SYS-BOOT-013`: interrupted programming must not cause a fault loop. The FRDM-MCXN947 `pflash` SDK example also disables multi-bit ECC bus errors before reading programmed flash. |
 | RB-03 | The SBL clears the flash cache (`SYSCON->NVM_CTRL.CLR_FLASH_CACHE`) and disables flash speculation before every `checkMemory` (`0202`) and `checkProgrammingDependencies` (`FF01`). | Avoid stale data from cache / speculation after programming. |
 | RB-04 | While it erases or programs bank 0, the SBL executes **only from RAM**: code, constant data, CAN driver and vector table (VTOR in RAM). No access to bank 0 except through the flash API. | The bank being erased / programmed cannot be read; a fetch from it stalls or faults. |
-| RB-05 | During long erase operations the SBL sends `7F 31 78` at least every P2* - [NC: 500] ms and keeps processing CAN between sector erases. | Keep the tester session alive. |
+| RB-05 | During long erase operations the SBL sends `7F 31 78` at least every P2* - 500 ms and keeps processing CAN between sector erases. | Keep the tester session alive. |
 | RB-06 | An application image flashed with a debugger must also contain a valid header (post-build step), and debugger flashing must never mass-erase the device. | The PBL starts only images with a valid header; a mass erase removes the PBL. |
 
 ## 11. Routines
@@ -205,7 +204,7 @@ until `50 02` arrives.
 |---|---|
 | dataFormatIdentifier (`34`) | 0x00 (no compression, no encryption) |
 | addressAndLengthFormatIdentifier | 0x44 |
-| maxNumberOfBlockLength | [NC: 0x0402] (1024 data bytes + SID + block sequence counter) |
+| maxNumberOfBlockLength | 0x0402 (1024 data bytes + SID + block sequence counter) |
 | Write granularity | 16-byte phrase; the last block is padded with 0xFF by the tester |
 | Erase granularity | 8 KiB sector |
 | P2server / P2*server | 50 ms / 5000 ms |
@@ -215,7 +214,7 @@ until `50 02` arrives.
 
 | # | Question | Affects | Answer |
 |---|---|---|---|
-| 1 | SBL load address and no-init RAM address | section 5 | Whether RAM survives a reset is not checked (no reference manual, no experiment, user decision 2026-10-04); covered by sections 8 - 10. |
-| 2 | PBL size 64 KiB enough? (CAN + ISO-TP + UDS + CRC, no flash driver) | section 5 | |
-| 3 | Seed source: TRNG or timer-based? | section 3 | |
-| 4 | Use the MCXN947 CRC engine or a software table CRC in the PBL? (start-up time `SYS-STA-001`) | SYS-BOOT-001 | |
+| 1 | SBL load address | section 5 | SBL in SRAMX: load area 0x0400_0000, 64 KiB; bss and stack 0x0401_0000, 32 KiB. Whether RAM survives a reset is not checked (user decision 2026-10-04); no RAM content is kept across a reset (section 8 removed). Closed (user, 2026-10-17). |
+| 2 | PBL size 64 KiB enough? (CAN + ISO-TP + UDS + CRC, no flash driver) | section 5 | Yes. Measured 2026-10-17 (GCC 15.2, `-Os`, `--gc-sections`, newlib-nano): startup, vector table, SDK FlexCAN, clock, reset and CRC drivers with a minimal CAN echo loop = 7.2 KiB flash, 3 KiB RAM (2 KiB stack, 1 KiB heap). Estimated additions: ISO-TP 3 - 4 KiB, UDS server (`10`, `11`, `22`, `27`, `31`, `34` / `36` / `37`, `3E`, NRCs, P2 / S3) 6 - 8 KiB, application check with fault recovery (RB-02) 1 - 2 KiB, boot window, timer, seed / key, DIDs 1 - 2 KiB: about 20 - 25 KiB for a lean PBL, about 35 - 40 KiB if the AUTOSAR stack modules (CanIf, PduR, CanTp, Dcm, Det) are reused with their configuration tables. 64 KiB is kept; to be confirmed with the map file of the first PBL build. Closed. |
+| 3 | Seed source: TRNG or timer-based? | section 3 | Timer-based (section 3). Closed (user, 2026-10-17). |
+| 4 | Use the MCXN947 CRC engine or a software table CRC in the PBL? (start-up time `SYS-STA-001`) | SYS-BOOT-001 | CRC engine (`CRC0`, SDK driver `fsl_crc`): the polynomial, seed, input / output reflection and final complement are programmable, so it computes CRC-32/ISO-HDLC (poly 0x04C11DB7, seed 0xFFFF_FFFF, reflect in / out, complement). Used in the PBL and the SBL; the result must match `zlib.crc32` of the tester (unit test against a known vector). Closed (user, 2026-10-17). |

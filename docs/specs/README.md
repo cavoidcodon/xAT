@@ -23,7 +23,7 @@ and code implements only `Approved` requirements.
 
 BSW and MCAL modules do **not** get a spec here: their requirements are the AUTOSAR SWS.
 What the project needs from a module (subset, configuration) is written in its task file
-(section "Requirements", column "Parent") and in `docs/modules/<Ma>.md` ("Derived
+(section "Requirements", column "Parent") and in `docs/modules/<Ma>/design.md` ("Derived
 requirements"). Each fact has one home:
 
 | Link | Kept only in |
@@ -86,6 +86,55 @@ Rules:
 | `TT` | target test on the board, with the plant model / tester on the Pi5 |
 | `RV` | review (code, configuration, document) |
 | `AN` | analysis (timing, memory map, calculation) |
+
+## Glossary
+
+Terms used in the requirements that need a precise meaning.
+
+### RLS (reverse lockout solenoid)
+
+An actuator commanded by the TCU in `TCU_Actuators` that decides whether reverse can
+engage. With RLS = OFF, selecting R does not engage reverse (the vehicle behaves as in N);
+with RLS = ON, reverse may engage. It prevents reverse from engaging while the vehicle is
+moving forward (`SG-01`).
+
+| RLS | Meaning |
+|---|---|
+| OFF (0) | locked: R does not engage reverse |
+| ON (1) | reverse allowed |
+
+- The TCU commands RLS = ON only while the selector position is R and the vehicle speed
+  is valid and below 2 km/h; otherwise OFF (`SYS-SEL-004`).
+- Once ON, RLS stays ON while R remains selected, so reverse is not released when the
+  speed rises slightly above the threshold during reversing.
+- The plant model engages reverse only while R is selected and RLS = ON. If
+  `TCU_Actuators` times out, the plant model uses RLS = OFF (fail-safe).
+
+### Latched and not latched
+
+These terms describe what happens to a state (a fault or a mode) after the condition that
+caused it has disappeared.
+
+| Term | Behaviour after the condition is gone | Cleared by |
+|---|---|---|
+| Latched | the state is kept | an explicit reset only (power cycle, ECU reset, ...) |
+| Not latched | the state is cleared automatically, usually after a recovery (debounce) time | the disappearance of the condition |
+
+Examples in this project:
+
+- **Not latched:** the selector fault (`SYS-SEL-002`) is set after 100 ms of invalid
+  selector input and clears after 500 ms of valid input. A short glitch in P, R or N
+  therefore does not lock the vehicle until the next power cycle.
+- **Latched:** limp-home (`SYS-FLT-004`) stays active until the next power cycle even if
+  the fault disappears. This avoids toggling between Normal and limp-home on an
+  intermittent fault.
+- **Both together:** a selector fault while D is selected clears by itself, but the
+  limp-home it caused stays latched.
+
+Rule of thumb: latch a fault whose reaction is safety-relevant or whose cause may be
+intermittent; do not latch a fault whose safe reaction is already in place and whose
+recovery carries no risk. In an SWC design, the column "Latch / recovery" of the fault
+table states which case applies and what clears it.
 
 ## Workflow
 

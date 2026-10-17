@@ -5,7 +5,7 @@
 | Scope    | Plant model, console and UDS tester on the Pi5; CAN gateway on the FRDM-MCXN236 |
 | Parent   | `../system/system_context.md`, `../system/can_matrix.md`, `../system/reprogramming.md` |
 | Version  | 0.1   |
-| Status   | Draft |
+| Status   | Approved |
 
 ## 1. Purpose and scope
 
@@ -34,7 +34,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | SYS-COM-001 |
 | Verification | TT - `candump -t d` |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-PLT-002 - Range and gear engagement
 
@@ -45,29 +45,29 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | RV; TT |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-PLT-003 - Shift dynamics
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When the engaged gear changes, the plant model shall move the input shaft speed from the old ratio to the new ratio over [NC: 400] ms. |
+| Statement    | When the engaged gear changes, the plant model shall move the input shaft speed from the old ratio to the new ratio over 400 ms. |
 | Rationale    | Gives `SYS-SFT-007` something realistic to monitor. |
 | Parent       | - |
 | Verification | RV |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-PLT-004 - Hydraulic default on missing TCU
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When `TCU_Actuators` has not been received for [NC: 50] ms, the plant model shall use SS_A = SS_B = OFF, PCS_Duty = 0 %, RLS = OFF, SLS = OFF, FaultLamp = OFF. |
+| Statement    | When `TCU_Actuators` has not been received for 50 ms, the plant model shall use SS_A = SS_B = OFF, PCS_Duty = 0 %, RLS = OFF, SLS = OFF, FaultLamp = OFF. |
 | Rationale    | Models the behaviour of an unpowered transmission (`system_context.md` section 4, item 3). |
 | Parent       | SYS-ACT-004, SYS-BOOT-008 |
 | Verification | TT - reset the TCU while driving |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-PLT-005 - Shift lock
 
@@ -78,7 +78,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | SYS-SEL-003 |
 | Verification | TT |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-PLT-006 - Vehicle and engine model
 
@@ -89,18 +89,18 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | RV - plots of an acceleration drive |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-PLT-007 - Line pressure and oil temperature
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The plant model shall compute the line pressure from PCS_Duty (0 % -> [NC: 20] bar, 100 % -> [NC: 3] bar, first-order lag [NC: 50] ms) and the oil temperature from a start value set in the console with a slow warm-up while driving, and convert both to sensor voltages with the characteristics of `can_matrix.md` section 4. |
+| Statement    | The plant model shall compute the line pressure from PCS_Duty (0 % -> 20 bar, 100 % -> 3 bar, first-order lag 50 ms) and the oil temperature from a start value set in the console with a slow warm-up while driving, and convert both to sensor voltages with the characteristics of `can_matrix.md` section 4. |
 | Rationale    | Inputs for `SYS-SEN-003` .. `SYS-SEN-006`. |
 | Parent       | - |
 | Verification | RV |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### 2.2 GW - gateway (FRDM-MCXN236)
 
@@ -113,18 +113,18 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | TT - `cansend` / `candump` loop with the TCU |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-GW-002 - Throughput and latency
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The gateway shall forward frames without loss up to [NC: 60] % bus load at 500 kbit/s, with a latency of at most [NC: 2] ms per direction. |
+| Statement    | The gateway shall forward frames without loss up to 60 % bus load at 500 kbit/s, with a latency of at most 2 ms per direction. |
 | Rationale    | Cyclic traffic (about 300 frames/s) plus ISO-TP downloads. |
 | Parent       | SYS-BOOT-010 |
 | Verification | TT - frame counters on both ends |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-GW-003 - Error reporting
 
@@ -135,7 +135,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | TT |
 | Priority     | Should |
-| Status       | Draft |
+| Status       | Approved |
 
 ### 2.3 CON - console
 
@@ -143,12 +143,12 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The console shall display every signal of `can_matrix.md` (inputs, outputs, status, fault bits as text), the message cycle times and the alive counter errors, refreshed at least every [NC: 100] ms. |
+| Statement    | The console shall display every signal of `can_matrix.md` (inputs, outputs, status, fault bits as text), the message cycle times and the alive counter errors, refreshed at least every 100 ms. |
 | Rationale    | Observe the TCU. |
 | Parent       | - |
 | Verification | RV |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-CON-002 - Driver inputs
 
@@ -159,7 +159,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | RV |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-CON-003 - Fault injection
 
@@ -170,7 +170,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | RV |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-CON-004 - Scenarios and logging
 
@@ -181,7 +181,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | RV |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### 2.4 TST - UDS tester
 
@@ -194,7 +194,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | SYS-BOOT-001 .. SYS-BOOT-010 |
 | Verification | TT |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-TST-002 - Negative scenarios
 
@@ -205,7 +205,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | TT |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-TST-003 - Diagnostic services
 
@@ -216,7 +216,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | SYS-DIA-002, SYS-DIA-005 |
 | Verification | TT |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ### SIM-TST-004 - Bus sharing
 
@@ -227,7 +227,7 @@ coding rules do not apply to it. It lives in `tools/sim/` (host tools) and
 | Parent       | - |
 | Verification | TT |
 | Priority     | Must |
-| Status       | Draft |
+| Status       | Approved |
 
 ## 3. Open questions
 
