@@ -24,8 +24,8 @@ MCAL tasks implement their AUTOSAR SWS.
 | TASK-014 | `PduR` | bsw/com | TASK-013 | TODO |
 | TASK-015 | `Com` (signals from `can_matrix.md`) | bsw/com | TASK-014 | TODO |
 | TASK-016 | Plant model and console (`tools/sim/`, SIM-PLT, SIM-CON) | tools | TASK-011 | TODO |
-| TASK-017 | `Rte` (handwritten, ports mapped to `Com`, DC-01) | rte | TASK-015 | TODO |
-| TASK-018 | SWCs: gear selector, vehicle speed, shift control, solenoid control (with SWR specs) | app | TASK-017, TASK-016, TASK-026 | TODO |
+| TASK-017 | `Rte` (handwritten, ports mapped to `Com`, DC-01) | rte | TASK-015, TASK-027, TASK-028 | TODO |
+| TASK-018 | SWCs: gear selector, vehicle speed, shift control, solenoid control, fault / mode manager (with SWR specs) | app | TASK-017, TASK-016, TASK-027 | TODO |
 | TASK-019 | `Wdg` (+ `WdgIf` / `WdgM` decision) | mcal | TASK-010 | TODO |
 | TASK-020 | `CanTp` | bsw/com | TASK-014 | TODO |
 | TASK-021 | `Dcm` (application UDS services, entry to the bootloader on `10 02`) | bsw/services | TASK-020 | TODO |
@@ -34,3 +34,5 @@ MCAL tasks implement their AUTOSAR SWS.
 | TASK-024 | SBL (`src/boot/sbl`) | boot | TASK-023 | TODO |
 | TASK-025 | `Dem` and `Dcm` services `14` / `19` (`SYS-FLT-007`; until then faults only in `TCU_Status.FaultBits`) | bsw/services | TASK-018, TASK-021 | TODO |
 | TASK-026 | System design: component and sequence diagrams for all approved system scenarios (PlantUML, `docs/architecture/system/`) | docs | — | DONE |
+| TASK-027 | SWC composition: RTE ports (signal flow), port -> `Com` mapping, runnable-to-task mapping (scheduling), `docs/architecture/swc_composition.md` | docs | TASK-026 | TODO |
+| TASK-028 | `IoHwAb` (board I/O: red LED via `Dio`; extensible to sensor / actuator signals of the hardware variant) | bsw/ecual | TASK-007, TASK-027 | TODO |
