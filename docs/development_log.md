@@ -603,3 +603,34 @@ The system design follows the spec update of N-01 .. N-11 (commit `0fcaba6`):
 | AC3 grep for software-design names | no match (rc = 1) |
 | `git diff --stat 0fcaba6 -- docs/specs src` | empty |
 
+
+## 2026-10-18: PBL -> SBL hand-over wording and `0301` response timing (spec update)
+
+### Summary
+
+- `reprogramming.md` (v0.6):
+  - Section 8 reworded: no state is kept in RAM across a reset; the PBL -> SBL hand-over at
+    `31 01 03 01` happens without a reset and is not affected. The old text ("no state is
+    passed between the application, PBL and SBL in RAM") contradicted section 1.
+  - Section 11: response to activateSecondaryBootloader. Refusals (`24` / `22`) come from the
+    PBL within P2server; otherwise the PBL sends `7F 31 78`, waits until it is transmitted
+    and starts the SBL, which sends `71 01 03 01 00` within P2*server (5000 ms). Step 11 of
+    section 2 updated.
+  - Open question 7 added and closed.
+- Diagrams: `seq_boot_programming.puml` (SC-BOOT-01 step 11) and `stm_tcu_modes.puml`
+  (transition PBL -> SBL programming session) show `7F 31 78` from the PBL.
+
+### Decisions (user)
+
+- Response pending from the PBL before the SBL starts, instead of an SBL response within
+  P2server: the SBL start-up time is not known yet, and the tester already handles
+  `7F 31 78` (step 13, RB-05).
+- Not covered: an SBL that hangs at start-up stays until a power cycle (open question 7).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc = 0 |
+| Render of `stm_tcu_modes` and `seq_boot_programming` to the scratchpad | rc = 0; transition label and step 11 viewed, layout correct |
+| Requirement IDs referenced in `docs/specs/` defined (grep script) | no undefined ID |

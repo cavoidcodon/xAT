@@ -34,7 +34,7 @@ Check --> Window : application valid (SYS-BOOT-001)
 Window --> PblProg : 10 02 received / 50 02\n(SYS-BOOT-011; SC-BOOT-01, SC-BOOT-07)
 Window -down-> Init : 50 ms without 10 02 / jump to the application\n(SYS-BOOT-001; SC-STA-01)
 PblDefault --> PblProg : 10 02 / 50 02, no reset\n(reprogramming sections 2, 3; SC-BOOT-05)
-PblProg --> SblProg : 31 01 03 01 [last 0202 OK, SBL header valid]\n(reprogramming section 11.1; SC-BOOT-01, SC-BOOT-03)
+PblProg --> SblProg : 31 01 03 01 [last 0202 OK, SBL header valid]\n/ 7F 31 78 (PBL), 71 01 03 01 00 (SBL)\n(reprogramming sections 11, 11.1; SC-BOOT-01, SC-BOOT-03)
 PblProg -up-> Reset : S3 = 5000 ms without request (SYS-BOOT-009; SC-BOOT-06),\n11 01, or 10 01 / 50 01 (reprogramming section 3)
 SblProg -up-> Reset : 11 01 (step 19; SC-BOOT-01, SC-BOOT-03),\nS3 = 5000 ms (SYS-BOOT-009; SC-BOOT-06), or 10 01 / 50 01
 PblDefault -up-> Reset : 11 01 (reprogramming section 3)

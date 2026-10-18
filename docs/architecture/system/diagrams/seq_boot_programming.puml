@@ -76,9 +76,11 @@ Tester -> PBL : 3E 80 (0x7DF, every 2 s)
 == PBL -> SBL: activation (step 11) ==
 Tester -> PBL : [11] 31 01 03 01
 PBL -> PBL : last 0202 returned 0 and the SBL header is valid\n(magic 0x53544178 xATS, header_crc32) (reprogramming section 11.1)
+PBL --> Tester : 7F 31 78
+note right of PBL: responsePending, transmitted before the SBL starts\n(reprogramming section 11)
 PBL -> SBL : start the SBL in SRAMX; hand over programming session,\nsecurity unlocked and CAN configuration in RAM (reprogramming section 1)
 SBL --> Tester : 71 01 03 01 00
-note right of SBL: answered by the SBL; no new 27 needed
+note right of SBL: answered by the SBL within P2* = 5000 ms\nafter 7F 31 78; no new 27 needed
 
 newpage SC-BOOT-01 - Nominal programming (page 3 of 3: SBL programming session, steps 12 .. 19, restart)
 

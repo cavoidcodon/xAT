@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | Application -> PBL -> SBL hand-over, UDS sequence, memory map, image formats |
 | Parent   | `system_requirements.md` (`SYS-DIA`, `SYS-BOOT`) |
-| Version  | 0.5   |
+| Version  | 0.6   |
 | Status   | Approved |
 
 ## 1. Software parts
@@ -36,7 +36,7 @@ every image's address space; `SYS-BOOT-004` requires that only the SBL calls the
 | 8 | PBL | `36 <bsc> <data>` ... | `76 <bsc>` | |
 | 9 | PBL | `37` | `77` | |
 | 10 | PBL | `31 01 02 02 <crc32>` | `71 01 02 02 00` | checkMemory of the SBL |
-| 11 | PBL -> SBL | `31 01 03 01` | `71 01 03 01 00` (sent by the SBL) | activateSecondaryBootloader |
+| 11 | PBL -> SBL | `31 01 03 01` | `7F 31 78` (sent by the PBL), then `71 01 03 01 00` (sent by the SBL) | activateSecondaryBootloader; response timing in section 11 |
 | 12 | SBL | `2E F1 5A <fingerprint>` | `6E F1 5A` | write fingerprint to boot info |
 | 13 | SBL | `31 01 FF 00 44 <addr> <size>` | `71 01 FF 00 00` | eraseMemory; `7F 31 78` while busy |
 | 14 | SBL | `34 00 44 <addr> <size>` | `74 20 <maxBlockLen>` | download application |
@@ -198,8 +198,10 @@ and CRC at every start (`SYS-BOOT-001`).
 ## 8. RAM boot record (removed)
 
 Removed on 2026-10-17 (user) together with `SYS-BOOT-003` and `SYS-BOOT-012`. No state is
-passed between the application, PBL and SBL in RAM. The section number is kept so that
-the later section numbers do not change.
+kept in RAM across a reset: after every reset the PBL starts without any information from
+the application, the SBL or an earlier PBL run. The PBL -> SBL hand-over at `31 01 03 01`
+(section 1) is not affected, because it happens without a reset. Reworded on 2026-10-18
+(user). The section number is kept so that the later section numbers do not change.
 
 ## 9. PBL start-up decision
 
@@ -242,6 +244,13 @@ application still answers).
 
 `min_pbl_version` and the PBL version (DID 0xF180) are compared as
 major << 16 | minor << 8 | patch.
+
+**Response to activateSecondaryBootloader (`0301`).** The PBL checks the conditions of
+section 11.1 and answers a refusal itself (`7F 31 24` / `7F 31 22`) within P2server. When the
+conditions hold, the PBL sends `7F 31 78` and waits until it is transmitted, then starts the
+SBL. The SBL sends the final response `71 01 03 01 00` within P2*server (5000 ms) after the
+`7F 31 78`. The tester waits up to P2*server for the final response; without it, it stops
+(`SIM-TST-001`). Added on 2026-10-18 (user).
 
 The application header sector (0x0001_4000 .. 0x0001_5FFF: header and the first 7 KiB of the
 image) is erased by `FF00` like the rest of the area, but the SBL programs it only after
@@ -289,3 +298,4 @@ Added on 2026-10-17 (user, system design finding F-05).
 | 4 | Use the MCXN947 CRC engine or a software table CRC in the PBL? (start-up time `SYS-STA-001`) | SYS-BOOT-001 | CRC engine (`CRC0`, SDK driver `fsl_crc`): the polynomial, seed, input / output reflection and final complement are programmable, so it computes CRC-32/ISO-HDLC (poly 0x04C11DB7, seed 0xFFFF_FFFF, reflect in / out, complement). Used in the PBL and the SBL; the result must match `zlib.crc32` of the tester (unit test against a known vector). Closed (user, 2026-10-17). |
 | 5 | System design findings F-01, F-04 .. F-08, F-17 (TASK-026 plan): sub-function of `28`, rejected images, sequence and address rules, services per session, entry with an invalid application, application `50 02` vs. PBL `50 02`, security lockout of level 0x01 | sections 2, 3, 9, 11 | Step 4 is `28 01 01`; section 2 entry with an invalid application; section 3 services table; section 11 header invalidation and 11.1 sequence rules. Closed (user, 2026-10-17). |
 | 6 | System design findings N-09, N-10 (`docs/architecture/system/system_design.md` section 10.2): security lockout across a reset, application header written last | sections 2, 3, 11 | Lockout not kept across a reset (accepted, v1); the SBL programs the header sector after `0202` / `FF01` passed. Closed (user, 2026-10-17). |
+| 7 | Section 8 wording vs. the PBL -> SBL hand-over in RAM; response timing of `31 01 03 01`, answered by the SBL after its start-up | sections 2, 8, 11 | Section 8 states that no state is kept in RAM across a reset; the hand-over without reset stays. The PBL sends `7F 31 78` before it starts the SBL; the SBL answers within P2*server. Not covered: an SBL that hangs at start-up stays until a power cycle (S3 needs a running SBL; no bootloader watchdog in the spec). Closed (user, 2026-10-18). |
