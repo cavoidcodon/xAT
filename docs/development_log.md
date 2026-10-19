@@ -634,3 +634,10 @@ The system design follows the spec update of N-01 .. N-11 (commit `0fcaba6`):
 | `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc = 0 |
 | Render of `stm_tcu_modes` and `seq_boot_programming` to the scratchpad | rc = 0; transition label and step 11 viewed, layout correct |
 | Requirement IDs referenced in `docs/specs/` defined (grep script) | no undefined ID |
+
+## 2026-10-19: System design approved
+
+### Summary
+
+- `docs/architecture/system/system_design.md` (v0.2): status `Draft (for review)` -> `Approved`
+  after the user review. It is now the approved input for the SWC composition (TASK-027).

@@ -5,7 +5,7 @@
 | Scope    | xAT system architecture: system elements, interfaces, requirement allocation, scenarios |
 | Task     | TASK-026 |
 | Version  | 0.2   |
-| Status   | Draft (for review) |
+| Status   | Approved |
 
 ## 1. Purpose
 
