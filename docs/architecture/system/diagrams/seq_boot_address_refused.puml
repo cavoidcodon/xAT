@@ -1,0 +1,61 @@
+@startuml seq_boot_address_refused
+title SC-BOOT-04 - Address and request sequence errors refused (PBL protection)
+
+participant "UDS tester" as Tester
+box "TCU"
+participant "PBL" as PBL
+participant "SBL" as SBL
+end box
+
+note over Tester, SBL
+Covers: SYS-BOOT-006, SYS-BOOT-004, SIM-TST-002, SG-06
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Memory map (reprogramming section 5): PBL 0x0000_0000 .. 0x0000_FFFF, boot info 0x0001_0000 .. 0x0001_3FFF,
+application 0x0001_4000 .. 0x000F_FFFF, bank 1 0x0010_0000 .. 0x001F_FFFF (reserved), SBL load area 0x0400_0000 .. 0x0400_FFFF.
+end note
+
+group PBL programming session, level 0x11 unlocked
+  Tester -> PBL : 34 00 44 00 00 00 00 <memSize>
+  PBL --> Tester : 7F 34 31
+  note right: requestOutOfRange: the range is not inside the SBL load area\n(reprogramming section 11.1); the PBL never writes flash (SYS-BOOT-004)
+  Tester -> PBL : 34 00 44 04 00 00 00 <memSize larger than 64 KiB>
+  PBL --> Tester : 7F 34 31
+  note right: end of the range beyond 0x0400_FFFF
+end
+
+group SBL programming session (state handed over by the PBL)
+  Tester -> SBL : 34 00 44 00 00 00 00 <memSize>
+  SBL --> Tester : 7F 34 31
+  note right: PBL area: outside the application and boot info areas (SYS-BOOT-006)
+  Tester -> SBL : 31 01 FF 00 44 00 00 00 00 <memSize>
+  SBL --> Tester : 7F 31 31
+  note right: eraseMemory of the PBL area refused (SYS-BOOT-006)
+  Tester -> SBL : 31 01 FF 00 44 00 10 00 00 <memSize>
+  SBL --> Tester : 7F 31 31
+  note right: bank 1 is outside the allowed areas
+  Tester -> SBL : 31 01 FF 00 44 00 01 44 00 <memSize>
+  SBL --> Tester : 7F 31 31
+  note right: 0x0001_4400 is not aligned to an 8 KiB sector (reprogramming section 11.1)
+end
+
+group request sequence errors (reprogramming section 11.1, PBL and SBL)
+  Tester -> SBL : 36 01 <data> (no download accepted by 34)
+  SBL --> Tester : 7F 36 24
+  Tester -> SBL : 37 (no download accepted by 34)
+  SBL --> Tester : 7F 37 24
+  Tester -> SBL : 34 00 44 00 01 40 00 <memSize>
+  SBL --> Tester : 74 20 04 02
+  Tester -> SBL : 36 02 <data> (expected block sequence counter 01)
+  SBL --> Tester : 7F 36 73
+  note right: wrongBlockSequenceCounter
+  Tester -> SBL : 31 01 02 02 <crc32> (no download completed with 37 since 34)
+  SBL --> Tester : 7F 31 24
+  note right: requestSequenceError
+end
+
+note over Tester, SBL
+Flash content unchanged by every refused request. The PBL can be updated only with a debugger
+(SYS-BOOT-006): SWD through the MCU-Link, never a mass erase (RB-06). Safe state of SG-06 kept: the PBL always survives.
+end note
+@enduml

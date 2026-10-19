@@ -1,0 +1,56 @@
+@startuml cmp_system_context
+title System context - physical view (elements E-01 .. E-15)
+
+actor "Console user (driver)\nE-15" as User
+
+node "Raspberry Pi 5 host, Ubuntu aarch64 (E-10)" as Pi {
+  component "Plant model (E-12)\nPython, SIM-PLT" as Plant
+  component "Console (E-13)\nterminal UI, SIM-CON" as Console
+  component "UDS tester (E-14)\nPython, SIM-TST" as Tester
+  component "slcand / SocketCAN can0 (E-11)\nLinux" as Can0
+  artifact "SBL and application images\n.bin with 1 KiB header" as Images
+}
+
+node "FRDM-MCXN236 CAN gateway (E-09)\ntest equipment" as GW {
+  component "SLCAN <-> CAN gateway firmware\nNXP SDK application, no xAT knowledge (DC-05)" as GwFw
+}
+
+queue "CAN bus (E-08)\nclassic CAN 2.0B, 11-bit IDs, 500 kbit/s,\n120 ohm termination at both ends" as Bus
+
+node "FRDM-MCXN947 TCU board (E-01)" as Board {
+  node "MCXN947 MCU (Cortex-M33 core 0)" as Mcu {
+    component "PBL (E-02)\nflash 0x0000_0000, 64 KiB" as PBL
+    component "SBL (E-03)\nSRAMX 0x0400_0000, downloaded" as SBL
+    component "Application (E-04)\nflash 0x0001_4000 (header + image)" as App
+  }
+  component "CAN connector J10\nTJA1057 transceiver" as J10
+  component "Red LED (E-05)" as LED
+  component "Debug UART (E-06)" as UART
+  component "MCU-Link (E-07)\nSWD debugger + VCOM" as Link
+}
+
+User --> Console : I-14 keyboard / terminal: driver inputs,\nfault injection, scripted scenarios, logs (SIM-CON-002 .. SIM-CON-004)
+Console <--> Plant : I-15 driver inputs, injected faults,\nplant state (host internal)
+Plant <--> Can0 : I-10 SocketCAN raw frames
+Tester <--> Can0 : I-10 SocketCAN can-isotp
+Console <.. Can0 : frames for display (SIM-CON-001;\nown socket or via the plant: console design)
+Images ..> Tester : I-16 image files
+Can0 <--> GwFw : I-09 SLCAN (Lawicel) ASCII over USB VCOM,\nstatus flags (SIM-GW-001, SIM-GW-003)
+GwFw <--> Bus : I-08 CAN, TJA1057
+Bus <--> J10 : I-08 CAN, 87.5 % sample point
+J10 <--> Mcu : CAN frames I-01 .. I-07
+Mcu --> LED : I-12 FaultLamp value (SYS-HMI-001)
+Mcu --> UART : I-11 status line every 500 ms
+UART --> Link : UART
+Mcu <--> Link : SWD
+Link <--> Pi : USB: VCOM (I-11) and CMSIS-DAP SWD\nflash / debug, no mass erase (I-13, RB-06)
+LED ..> User : I-12 light
+GW ..> User : bus-off LED (SIM-GW-003)
+
+note bottom of Bus
+Only bus nodes: TCU (J10) and gateway (can_matrix section 1).
+The gateway forwards every frame in both directions unchanged (SIM-GW-001).
+Covers: SYS-COM-001, SYS-HMI-001, SYS-HMI-002, SYS-BOOT-006, SIM-GW-001, SIM-GW-002,
+SIM-GW-003, SIM-CON-001, SIM-CON-002, SIM-CON-003, SIM-CON-004, SIM-TST-001, SIM-TST-004
+end note
+@enduml

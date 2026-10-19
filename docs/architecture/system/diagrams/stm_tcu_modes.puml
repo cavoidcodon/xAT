@@ -1,0 +1,60 @@
+@startuml stm_tcu_modes
+title TCU operating modes and running software part (system_context section 5)
+
+state "Reset" as Reset
+Reset : MCU reset = power cycle\n(power-on, watchdog or software reset)
+
+state "Bootloader" as Bootloader {
+  state "PBL application check" as Check
+  Check : header, hw_id, min_pbl_version, image CRC32\n(SYS-BOOT-001, SYS-BOOT-013)
+  state "PBL boot window" as Window
+  Window : listen 50 ms for 10 02 on 0x7E1 (SYS-BOOT-011)
+  state "PBL default session" as PblDefault
+  PblDefault : wait for a tester without time limit (SYS-BOOT-002)
+  state "PBL programming session" as PblProg
+  PblProg : 27 11 / 12, SBL download into SRAMX
+  state "SBL programming session" as SblProg
+  SblProg : erase / write application and boot info
+}
+Bootloader : no TCU_Actuators / TCU_Status (SYS-BOOT-008);\nplant in the hydraulic default (SIM-PLT-004)
+
+state "Application" as Application {
+  state "Init" as Init
+  Init : no TCU_Actuators / TCU_Status\n(SYS-ACT-004, SYS-COM-004)
+  state "Normal" as Normal
+  Normal : control active: shift schedule, all functions\n(system_context section 5)
+  state "Limp-home" as Limp
+  Limp : SS_A = SS_B = OFF, PCS_Duty = 0 %,\nFaultLamp = ON, latched (SYS-FLT-001, SYS-FLT-004)
+}
+
+[*] -down-> Reset : power-on
+Reset -down-> Check
+Check --> PblDefault : application invalid\n(SYS-BOOT-002, SYS-BOOT-013; SC-STA-02, SC-BOOT-03, SC-BOOT-05)
+Check --> Window : application valid (SYS-BOOT-001)
+Window --> PblProg : 10 02 received / 50 02\n(SYS-BOOT-011; SC-BOOT-01, SC-BOOT-07)
+Window -down-> Init : 50 ms without 10 02 / jump to the application\n(SYS-BOOT-001; SC-STA-01)
+PblDefault --> PblProg : 10 02 / 50 02, no reset\n(reprogramming sections 2, 3; SC-BOOT-05)
+PblProg --> SblProg : 31 01 03 01 [last 0202 OK, SBL header valid]\n/ 7F 31 78 (PBL), 71 01 03 01 00 (SBL)\n(reprogramming sections 11, 11.1; SC-BOOT-01, SC-BOOT-03)
+PblProg -up-> Reset : S3 = 5000 ms without request (SYS-BOOT-009; SC-BOOT-06),\n11 01, or 10 01 / 50 01 (reprogramming section 3)
+SblProg -up-> Reset : 11 01 (step 19; SC-BOOT-01, SC-BOOT-03),\nS3 = 5000 ms (SYS-BOOT-009; SC-BOOT-06), or 10 01 / 50 01
+PblDefault -up-> Reset : 11 01 (reprogramming section 3)
+
+Init --> Normal : control active, no fault of SYS-FLT-002\n<= 500 ms after reset (SYS-STA-001; SC-STA-01)
+Init --> Limp : control active with limp-home outputs, e.g. no plant\nmessages for 30 ms (SYS-STA-001, SYS-COM-002; SC-STA-01)
+Normal --> Limp : fault of SYS-FLT-002 / limp-home outputs <= 100 ms (SYS-FLT-003;\nSC-FLT-01 .. SC-FLT-06, SC-SEL-02, SC-SFT-06, SC-COM-01, SC-COM-02, SC-COM-04)
+Limp --> Limp : fault disappears: stays latched (SYS-FLT-004)
+
+Application -up-> Reset : 10 02 accepted [standstill, P, speed valid] / 50 02,\nsoftware reset <= 20 ms (SYS-DIA-004, SYS-BOOT-014; SC-BOOT-01)
+Application -up-> Reset : 11 01 / 51 01 (SC-DIA-03, SC-BOOT-07)
+Application -up-> Reset : 10 ms cycle stopped / watchdog <= 100 ms\n(SYS-STA-002; SC-STA-03)
+Bootloader -up-> Reset : power loss or reset at any step\n(SYS-BOOT-007; SC-BOOT-05)
+
+note right of Application
+Covers: SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-007, SYS-BOOT-008, SYS-BOOT-009,
+SYS-BOOT-011, SYS-BOOT-013, SYS-BOOT-014, SYS-ACT-004, SYS-COM-002, SYS-COM-004,
+SYS-DIA-004, SYS-STA-001, SYS-STA-002, SYS-FLT-001, SYS-FLT-002, SYS-FLT-003,
+SYS-FLT-004, SIM-PLT-004
+Mode names of system_context section 5: Init, Normal, Limp-home, Bootloader.
+A power loss in any state leads to Reset.
+end note
+@enduml

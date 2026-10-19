@@ -1,0 +1,55 @@
+@startuml seq_sel_reverse_lockout
+title SC-SEL-04 - Reverse lockout and reverse line pressure
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SEL-004, SYS-ACT-003, SYS-FLT-001, SYS-SEN-002, SIM-PLT-002, SIM-PLT-007, SG-01
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+SIM_Driver.Selector 1 = R; TCU_Actuators.RLS 0 = OFF (locked), 1 = ON (reverse allowed).
+end note
+
+note over Plant, TCU
+RLS = ON only while the selector is R and the vehicle speed is valid and below 2 km/h;
+once ON, RLS stays ON while R remains selected and the vehicle speed is valid (SYS-SEL-004).
+The speed threshold is evaluated continuously while RLS is OFF.
+end note
+
+alt R selected at standstill with a valid vehicle speed
+  User -> Console : select R
+  Console -> Plant : selector R
+  Plant -> TCU : SIM_Driver: Selector = 1 (R); SIM_Speed: OutputShaftSpeed valid
+  ... 50 ms (SYS-SEL-001) ...
+  TCU -> TCU : R, speed valid, < 2 km/h -> RLS = ON (SYS-SEL-004)
+  TCU -> Plant : TCU_Actuators: RLS = 1 (ON), PCS_Duty <= 29.4 %
+  note right of TCU: line pressure >= 15 bar with\n0 % -> 20 bar, 100 % -> 3 bar (SYS-ACT-003)
+  Plant -> Plant : RLS = ON: reverse engaged (SIM-PLT-002);\nline pressure >= 15 bar (SIM-PLT-007)
+  ... vehicle reverses, speed rises above 2 km/h ...
+  TCU -> Plant : TCU_Actuators: RLS = 1 (ON) kept while R remains selected and the speed is valid
+else R selected while moving at >= 2 km/h
+  Plant -> TCU : SIM_Driver: Selector = 1 (R); vehicle speed >= 2 km/h
+  ... 50 ms (SYS-SEL-001) ...
+  TCU -> TCU : speed >= 2 km/h -> RLS = OFF (SYS-SEL-004)
+  TCU -> Plant : TCU_Actuators: RLS = 0 (OFF)
+  Plant -> Plant : RLS = OFF: no gear engaged (neutral) (SIM-PLT-002)
+  note over Plant, TCU: Safe state of SG-01: neutral, reverse locked out.
+  ... R stays selected, vehicle slows down below 2 km/h ...
+  TCU -> TCU : R, speed valid, < 2 km/h -> RLS = ON\n(no new selection of R needed, SYS-SEL-004 note)
+  TCU -> Plant : TCU_Actuators: RLS = 1 (ON), PCS_Duty <= 29.4 % (SYS-ACT-003)
+  Plant -> Plant : reverse engaged
+else vehicle speed becomes invalid while R is selected and RLS = ON
+  Plant -> TCU : SIM_Speed: OutputShaftSpeed > 8000 rpm (invalid)
+  TCU -> TCU : vehicle speed invalid -> RLS = OFF, also when RLS was ON (SYS-SEL-004 note);\nshaft speed invalid fault -> limp-home (SC-FLT-02)
+  TCU -> Plant : TCU_Actuators: RLS = 0 (OFF), SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON
+  Plant -> Plant : RLS = OFF: reverse released, neutral (SIM-PLT-002)
+  note over Plant, TCU: Safe state of SG-01: neutral, reverse locked out.
+end
+
+note over Plant, TCU
+In limp-home the interlock stays active (SYS-FLT-001): RLS follows SYS-SEL-004 with PCS_Duty = 0 % (20 bar).
+A SIM_Speed timeout also makes the speeds invalid (SC-COM-01) and gives RLS = OFF.
+end note
+@enduml

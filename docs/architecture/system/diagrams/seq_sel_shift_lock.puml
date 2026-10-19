@@ -1,0 +1,45 @@
+@startuml seq_sel_shift_lock
+title SC-SEL-03 - Shift lock (brake interlock) when leaving P
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SEL-003, SYS-FLT-001, SIM-PLT-005, SIM-CON-002, SG-03
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active (Normal or Limp-home), selector P accepted
+note over Plant, TCU: SLS = ON only while the selector is P, the brake is pressed\nand the vehicle is at standstill (< 2 km/h); otherwise SLS = OFF (SYS-SEL-003)
+
+alt brake pressed and vehicle at standstill
+  User -> Console : press the brake
+  Console -> Plant : Brake = pressed
+  Plant -> TCU : SIM_Driver: Selector = 0 (P), Brake = 1
+  TCU -> TCU : P, brake pressed, standstill -> SLS = ON (SYS-SEL-003)
+  TCU -> Plant : TCU_Actuators: SLS = 1 (ON)
+  User -> Console : select N
+  Console -> Plant : selector change out of P
+  Plant -> Plant : SLS = ON: the lever leaves P (SIM-PLT-005)
+  Plant -> TCU : SIM_Driver: Selector = 2 (N), Brake = 1
+  ... 50 ms (SYS-SEL-001) ...
+  TCU -> TCU : N accepted, selector not P -> SLS = OFF
+  TCU -> Plant : TCU_Actuators: SLS = 0 (OFF)
+else brake released or vehicle not at standstill (>= 2 km/h)
+  Plant -> TCU : SIM_Driver: Selector = 0 (P), Brake = 0
+  TCU -> TCU : condition of SYS-SEL-003 not met -> SLS = OFF
+  TCU -> Plant : TCU_Actuators: SLS = 0 (OFF)
+  User -> Console : select N
+  Console -> Plant : selector change out of P
+  Plant -> Plant : SLS = OFF: request ignored, lever stays in P (SIM-PLT-005)
+  Plant -> TCU : SIM_Driver: Selector = 0 (P)
+  note over Plant, TCU: Safe state of SG-03: the vehicle stays in P, no drive torque.
+end
+
+note over Plant, TCU
+The interlock stays active in limp-home (SYS-FLT-001).
+Without TCU_Actuators the plant uses SLS = OFF, so the selector stays locked in P (SIM-PLT-004).
+end note
+@enduml

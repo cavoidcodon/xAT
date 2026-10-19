@@ -1,0 +1,55 @@
+@startuml seq_dia_security_reset
+title SC-DIA-03 - Security access level 0x01 and ECU reset (application)
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over Tester, TCU
+Covers: SYS-DIA-002, SYS-STA-001, SYS-ACT-004, SYS-FLT-004, SYS-FLT-007, SIM-PLT-004
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, default session
+Tester -> TCU : 27 01
+TCU --> Tester : 7F 27 7F
+note right: 27 only in the extended session (reprogramming section 3)
+Tester -> TCU : 10 03
+TCU --> Tester : 50 03 00 32 01 F4
+
+== security access level 0x01 ==
+Tester -> TCU : 27 01
+TCU --> Tester : 67 01 <seed, 4 bytes>
+note right: seed = free-running 32-bit timer, 0 replaced by 1\n(reprogramming section 3)
+Tester -> Tester : key = rotl32(seed, 7) XOR 0x5A3C_C3A5
+alt correct key
+  Tester -> TCU : 27 02 <key, 4 bytes>
+  TCU --> Tester : 67 02
+  note right: level 0x01 unlocked; it unlocks nothing in v1\n(reserved for later writes with 2E)
+  opt seed requested again while unlocked
+    Tester -> TCU : 27 01
+    TCU --> Tester : 67 01 00 00 00 00
+    note right: seed 0 = already unlocked
+  end
+else wrong key, 3 attempts
+  Tester -> TCU : 27 02 <wrong key>
+  TCU --> Tester : 7F 27 35
+  note right: invalidKey (ISO 14229-1), attempts 1 and 2
+  Tester -> TCU : 27 01 / 27 02 <wrong key> (third attempt)
+  TCU --> Tester : 7F 27 36
+  Tester -> TCU : 27 01 (within 10 s)
+  TCU --> Tester : 7F 27 37
+  note right: same lockout rule as level 0x11:\n36 on the third failure, 37 for 10 s\n(reprogramming section 3, SYS-BOOT-005)
+end
+
+== ECU reset ==
+Tester -> TCU : 11 01
+TCU --> Tester : 51 01
+TCU -> TCU : software reset (power cycle): session, security state, limp-home,\nfault bits and volatile DTC memory cleared (SYS-FLT-004, SYS-FLT-007)
+... 50 ms without TCU_Actuators ...
+Plant -> Plant : hydraulic default (SIM-PLT-004)
+TCU -> TCU : PBL check, 50 ms boot window, application Init (SC-STA-01)
+TCU -> Plant : TCU_Actuators every 10 ms, TCU_Status every 100 ms
+note right of TCU: control active <= 500 ms after the reset (SYS-STA-001);\nnothing transmitted before (SYS-ACT-004)
+@enduml

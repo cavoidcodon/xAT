@@ -1,0 +1,43 @@
+@startuml seq_com_comm_control
+title SC-COM-03 - Communication control: stop and restart TCU transmission
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over Tester, TCU
+Covers: SYS-COM-005, SYS-DIA-002, SYS-DIA-003, SYS-COM-004, SIM-PLT-004, SIM-TST-004
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, default session; the tester runs beside the plant model (SIM-TST-004)
+Tester -> TCU : 28 01 01
+TCU --> Tester : 7F 28 7F
+note right: 28 only in the extended session (reprogramming section 3)
+Tester -> TCU : 10 03
+TCU --> Tester : 50 03 00 32 01 F4
+Tester -> TCU : 28 01 01
+TCU --> Tester : 68 01
+TCU -> TCU : stop TCU_Actuators and TCU_Status (enableRxAndDisableTx, SYS-COM-005)
+note right of TCU: t0 = time of the last TCU_Actuators frame
+
+loop every 10 ms, reception continues (SYS-COM-005)
+  Plant -> TCU : SIM_Driver, SIM_Speed, SIM_Analog
+end
+... 50 ms without TCU_Actuators ...
+Plant -> Plant : t0 + 50 ms: hydraulic default SS_A = SS_B = OFF, PCS_Duty = 0 %,\nRLS = OFF, SLS = OFF, FaultLamp = OFF (SIM-PLT-004)
+
+alt restart by the tester
+  Tester -> TCU : 28 00 01
+  TCU --> Tester : 68 00
+  TCU -> TCU : restart transmission (enableRxAndTx, SYS-COM-005)
+else tester stops: no request for S3 = 5000 ms
+  ... 5000 ms without request ...
+  TCU -> TCU : back to the default session, effect of 28 (and 85) undone (SYS-DIA-003)
+end
+loop TCU transmission running again
+  TCU -> Plant : TCU_Actuators every 10 ms, TCU_Status every 100 ms (SYS-COM-004)
+end
+Plant -> Plant : uses TCU_Actuators again
+@enduml

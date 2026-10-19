@@ -1,0 +1,63 @@
+@startuml seq_dia_read_dids
+title SC-DIA-02 - Read identification DIDs in the application, PBL and SBL
+
+participant "UDS tester" as Tester
+box "TCU"
+participant "Application" as App
+participant "PBL" as PBL
+participant "SBL" as SBL
+end box
+
+note over Tester, SBL
+Covers: SYS-DIA-005, SYS-DIA-001, SYS-DIA-002, SIM-TST-003
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+The TCU is split into its software parts because the DIDs depend on the running part (reprogramming section 4).
+end note
+
+group application running (default or extended session)
+  Tester -> App : 22 F1 80
+  App --> Tester : 62 F1 80 <major> <minor> <patch> 00
+  note right: PBL software version
+  Tester -> App : 22 F1 81
+  App --> Tester : 62 F1 81 <sw_version, 4 bytes>
+  note right: application version from the image header
+  Tester -> App : 22 F1 86
+  App --> Tester : 62 F1 86 01 (default) or 03 (extended)
+  Tester -> App : 22 F1 87
+  App --> Tester : 62 F1 87 <ASCII xAT-TCU padded with spaces, 16 bytes>
+  Tester -> App : 22 F1 8C
+  App --> Tester : 62 F1 8C <MCU unique ID, 16 bytes>
+  Tester -> App : 22 F1 5A
+  App --> Tester : 62 F1 5A <tester id (2), date YYMMDD BCD (3), reserved (11)>
+  Tester -> App : 22 FD 00
+  App --> Tester : 62 FD 00 <programming counter, 2 bytes>
+  Tester -> App : 22 FD 01
+  App --> Tester : 7F 22 31
+  note right: requestOutOfRange (ISO 14229-1):\nFD01 exists only in the SBL
+end
+
+group PBL running (default or programming session)
+  Tester -> PBL : 22 F1 80, F1 87, F1 8C, F1 5A, FD 00
+  PBL --> Tester : 62 ... as in the application
+  Tester -> PBL : 22 F1 81
+  PBL --> Tester : 62 F1 81 <sw_version> or 62 F1 81 FF FF FF FF
+  note right: 0xFFFFFFFF if the application is invalid
+  Tester -> PBL : 22 F1 86
+  PBL --> Tester : 62 F1 86 01 (default) or 02 (programming)
+  Tester -> PBL : 22 FD 01
+  PBL --> Tester : 7F 22 31
+  note right: requestOutOfRange (ISO 14229-1)
+end
+
+group SBL running (programming session)
+  Tester -> SBL : 22 F1 80, F1 81, F1 87, F1 8C, F1 5A, FD 00
+  SBL --> Tester : 62 ... as in the PBL
+  Tester -> SBL : 22 F1 86
+  SBL --> Tester : 62 F1 86 02
+  Tester -> SBL : 22 FD 01
+  SBL --> Tester : 62 FD 01 <SBL software version, 4 bytes>
+end
+
+note over Tester, SBL: F15A and FD00 come from the newest valid boot info record (reprogramming section 7); the SBL writes F15A at step 12 (SC-BOOT-01).
+@enduml

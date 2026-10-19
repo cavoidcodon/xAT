@@ -3,7 +3,7 @@
 | Field    | Value  |
 |----------|--------|
 | Scope    | xAT system (TCU and simulation environment) |
-| Version  | 0.1    |
+| Version  | 0.2    |
 | Status   | Approved  |
 
 ## 1. Purpose
@@ -115,10 +115,14 @@ mismatch shows up as a ratio plausibility fault (`SYS-SEN-005`).
 
 | Mode | Entered when | Behaviour |
 |---|---|---|
-| Init | reset, until control is active | no `TCU_Actuators` sent; plant applies the hydraulic default |
+| Init | reset of the application, until control is active | no `TCU_Actuators` / `TCU_Status` sent; plant applies the hydraulic default |
 | Normal | control active, no relevant fault | shift schedule, all functions |
 | Limp-home | a fault listed in `SYS-FLT-002` | fixed 3rd in D, maximum pressure, fault lamp ON; latched until reset |
-| Programming | UDS programming request accepted | application stopped; PBL / SBL running (`reprogramming.md`) |
+| Bootloader | after every reset (PBL application check, 50 ms boot window), no valid application, or programming entry | application not running; PBL default session, PBL programming session or SBL programming session; no `TCU_*` messages, plant applies the hydraulic default (`reprogramming.md`) |
+
+Changed on 2026-10-17 (user, system design finding F-18): the mode "Programming" became
+"Bootloader", which also covers the PBL start-up and the PBL default session with an invalid
+application; Init sends no `TCU_Status` either.
 
 ## 6. Out of scope (v1)
 

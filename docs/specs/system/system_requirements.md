@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | TCU (FRDM-MCXN947) as a black box |
 | Parent   | `safety_goals.md`, `system_context.md` |
-| Version  | 0.1   |
+| Version  | 0.4   |
 | Status   | Approved |
 
 ## 1. Purpose and scope
@@ -24,7 +24,7 @@ specified in `../simulation/sim_requirements.md`.
 | Vehicle speed | speed computed by the TCU from OutputShaftSpeed (`SYS-SEN-001`) |
 | Standstill | vehicle speed < 2 km/h |
 | Control active | the TCU sends `TCU_Actuators` with values computed by the control functions |
-| Shift in progress | from the change of the commanded gear until shift completion (`SYS-SFT-007`) |
+| Shift in progress | while D is selected: from the change of the commanded gear until shift completion (`SYS-SFT-007`) |
 | Fault | a condition detected by a requirement of this document; each fault has a bit in `TCU_Status.FaultBits` |
 | Power cycle | MCU reset (power-on, watchdog or software reset) |
 
@@ -36,12 +36,16 @@ specified in `../simulation/sim_requirements.md`.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall determine the selector position P, R, N or D from `SIM_Driver.Selector`, accepting a new position only after it has been received unchanged for 50 ms. |
+| Statement    | The TCU shall determine the selector position P, R, N or D from `SIM_Driver.Selector`, accepting a new position only after it has been received unchanged for 50 ms. Until the first position has been accepted after reset, the TCU shall treat the selector position as N. |
 | Rationale    | Filter short glitches while the lever moves between positions. |
 | Parent       | - |
 | Verification | UT - step the input and check the delay; TT - move the selector from the console |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding F-09): the position before the
+first accepted value is N, so that no drive torque is prepared before the input is known
+(`SG-03`).
 
 ### SYS-SEL-002 - Invalid selector position
 
@@ -76,7 +80,7 @@ selector fault has cleared.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall command RLS = ON only while the selector position is R and the vehicle speed is valid and below 2 km/h; otherwise RLS = OFF. Once ON, RLS stays ON while R remains selected. |
+| Statement    | The TCU shall command RLS = ON only while the selector position is R and the vehicle speed is valid and below 2 km/h; otherwise RLS = OFF. Once ON, RLS stays ON while R remains selected and the vehicle speed is valid. |
 | Rationale    | Reverse must not engage while moving forward. |
 | Parent       | SG-01 |
 | Verification | UT; TT - select R at 1 km/h (engages) and at 20 km/h (stays neutral) |
@@ -87,14 +91,17 @@ Note: the speed threshold is checked only while RLS is OFF. It is evaluated cont
 so if R is already selected and the speed falls below 2 km/h, RLS turns ON then; it does
 not require selecting R again. Once ON, a speed above 2 km/h does not turn RLS OFF.
 
-Note: with an invalid vehicle speed, reverse is locked out, also in limp-home. Without a valid speed the TCU cannot know that the vehicle
-is slow enough, so the safe reaction (no reverse) takes priority over availability.
+Note: with an invalid vehicle speed, reverse is locked out, also in limp-home and also when
+RLS was already ON. Without a valid speed the TCU cannot know that the vehicle is slow enough,
+so the safe reaction (no reverse) takes priority over availability. Changed on 2026-10-17
+(user, system design finding F-13): the hold condition "while R remains selected" now also
+requires a valid vehicle speed.
 
 ### SYS-SEL-005 - Outputs in P, R and N
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | While the selector position is P, R or N, the TCU shall command the solenoid pattern (`SYS-ACT-001`) of the gear that it would command if D were selected (`SYS-SFT-006`): 1st gear at standstill, otherwise the gear given by the shift schedule within the limit of `SYS-SFT-005`. |
+| Statement    | While the selector position is P, R or N, the TCU shall command the solenoid pattern (`SYS-ACT-001`) of the gear that it would command if D were selected (`SYS-SFT-006`): 1st gear at standstill, otherwise the gear given by the shift schedule within the limit of `SYS-SFT-005` (`SYS-SFT-006`). In P, R and N the solenoid pattern follows this gear directly: `SYS-SFT-003`, `SYS-SFT-004` and `SYS-SFT-007` do not apply; `SYS-SFT-005` applies. |
 | Rationale    | The gear is already prepared when D is selected. The plant engages the gear of SS_A / SS_B as soon as the lever reaches D, before the TCU has accepted D (`SYS-SEL-001`, 50 ms); a prepared low gear while rolling would overspeed the input shaft. |
 | Parent       | SG-02, SG-03 |
 | Verification | UT |
@@ -105,6 +112,11 @@ Note: changed on 2026-10-17 (user). The former statement commanded 1st gear in P
 at every speed. Selecting D at 100 km/h would then engage 1st gear in the plant for at
 least the 50 ms selector debounce (predicted input shaft speed about 8460 rpm), which
 violates `SG-02`.
+
+Note: changed on 2026-10-17 (user, system design finding F-02): without a forward gear
+engaged, a change of the prepared pattern cannot complete as a shift; shift monitoring in
+P, R or N would set the shift fault and enter limp-home while coasting in N. Selecting D
+takes over the prepared gear without a shift.
 
 ### 3.2 SFT - gear selection and shifting
 
@@ -197,29 +209,37 @@ Note: the limp-home outputs (`SYS-FLT-001`) are not delayed by this requirement.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When D is selected at standstill, the TCU shall command 1st gear. When D is selected above standstill, the TCU shall command the gear given by the shift schedule within the limit of `SYS-SFT-005`. |
+| Statement    | When D is selected at standstill, the TCU shall command 1st gear. When D is selected above standstill, the TCU shall command the gear given by the shift schedule; if the predicted input shaft speed of that gear exceeds the limit of `SYS-SFT-005`, the TCU shall command the lowest higher gear whose prediction is within the limit. |
 | Rationale    | Defined start gear; N -> D while rolling must not select a wrong gear. |
 | Parent       | SG-02 |
 | Verification | UT |
 | Priority     | Must |
 | Status       | Approved |
 
+Note: changed on 2026-10-17 (user, system design finding N-11): the gear selected when the schedule gear is
+over the limit is named. 4th gear is always within the limit (8000 rpm x 0.70 = 5600 rpm).
+
 ### SYS-SFT-007 - Shift completion monitoring
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall consider a shift complete when InputShaftSpeed / OutputShaftSpeed stays within +/-5 % of the target gear ratio for 100 ms. If a shift is not complete within 800 ms, the TCU shall set the shift fault. The check is done only when OutputShaftSpeed > 200 rpm. |
+| Statement    | While D is selected, the TCU shall consider a shift complete when InputShaftSpeed / OutputShaftSpeed stays within +/-5 % of the target gear ratio for 100 ms, or when OutputShaftSpeed is at or below 200 rpm. If a shift is not complete within 800 ms, the TCU shall set the shift fault. |
 | Rationale    | Detect a stuck solenoid or a slipping clutch. |
 | Parent       | SG-04 |
 | Verification | UT; TT - console injects a stuck solenoid |
 | Priority     | Must |
 | Status       | Approved |
 
+Note: changed on 2026-10-17 (user, system design findings F-02, F-03). The former statement
+did the check only above 200 rpm but gave no completion below it, so a shift started near
+standstill stayed in progress and blocked `SYS-SFT-004` and `SYS-SEN-005`. Shifts exist only
+in D (`SYS-SEL-005`).
+
 ### SYS-SFT-008 - Cold oil
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall inhibit 4th gear when the oil temperature falls below -10 degC and release the inhibit when it rises above -5 degC; at startup, 4th gear is inhibited if the oil temperature is at or below -5 degC. While 4th gear is inhibited, the TCU shall not command 4th gear, and if 4th gear is commanded when the inhibit becomes active, the TCU shall downshift to 3rd. |
+| Statement    | The TCU shall inhibit 4th gear when the oil temperature falls below -10 degC and release the inhibit when it rises above -5 degC; at startup, 4th gear is inhibited if the oil temperature is at or below -5 degC, where "at startup" is the first oil temperature received after reset (first `SIM_Analog` reception without an oil temperature sensor fault). While 4th gear is inhibited, the TCU shall not command 4th gear, and if 4th gear is commanded when the inhibit becomes active, the TCU shall downshift to 3rd. |
 | Rationale    | Protect the transmission when the oil is viscous. |
 | Parent       | - |
 | Verification | UT - thresholds -10 degC and -5 degC +/- 1 K, startup at -7 degC (inhibited), inhibit becoming active in 4th (downshift to 3rd), refused downshift from 4th (`SYS-SFT-005`) keeps 4th |
@@ -227,6 +247,10 @@ Note: the limp-home outputs (`SYS-FLT-001`) are not delayed by this requirement.
 | Status       | Approved |
 
 Note: `SYS-SFT-005` takes priority; if the downshift from 4th is refused, 4th is kept.
+
+Note: changed on 2026-10-17 (user, system design finding N-07): before the first reception the substitute
+80 degC applies (`SYS-COM-002`); evaluated on it, a first real value inside the -10 .. -5 degC
+band would never set the inhibit.
 
 ### 3.3 ACT - actuators
 
@@ -295,12 +319,15 @@ With the values above, 15 bar corresponds to PCS_Duty <= 29.4 %.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall use InputShaftSpeed and OutputShaftSpeed in the range 0 .. 8000 rpm and treat larger values as invalid. |
+| Statement    | The TCU shall use InputShaftSpeed and OutputShaftSpeed in the range 0 .. 8000 rpm, treat larger values as invalid and set the shaft speed invalid fault on the first invalid value. |
 | Rationale    | Defined valid range. |
 | Parent       | - |
 | Verification | UT |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding F-11): no debounce; a speed above
+8000 rpm is outside the sensor range and cannot be a valid value.
 
 ### SYS-SEN-003 - Analog sensor conversion
 
@@ -328,23 +355,29 @@ With the values above, 15 bar corresponds to PCS_Duty <= 29.4 %.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When no shift is in progress, a forward gear is engaged and OutputShaftSpeed > 200 rpm, the TCU shall set the ratio fault if InputShaftSpeed / OutputShaftSpeed differs from the commanded gear ratio by more than 10 % for longer than 500 ms. |
+| Statement    | When D is selected, no shift is in progress and OutputShaftSpeed > 200 rpm, the TCU shall set the ratio fault if InputShaftSpeed / OutputShaftSpeed differs from the commanded gear ratio by more than 10 % for longer than 500 ms. |
 | Rationale    | Detect a wrong gear, a slipping clutch or a speed sensor fault. |
 | Parent       | SG-04 |
 | Verification | UT; TT - console injects a wrong input shaft speed |
 | Priority     | Must |
 | Status       | Approved |
 
+Note: changed on 2026-10-17 (user, system design finding F-02): "a forward gear is engaged"
+replaced by "D is selected"; the TCU cannot observe the engaged gear.
+
 ### SYS-SEN-006 - Line pressure plausibility
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When the measured line pressure differs from the pressure expected for the commanded PCS_Duty by more than 3 bar for longer than 500 ms, the TCU shall set the pressure fault. |
+| Statement    | When the measured line pressure differs from the pressure expected for the commanded PCS_Duty by more than 3 bar for longer than 500 ms, the TCU shall set the pressure fault. The check is suspended while the line pressure sensor fault (`SYS-SEN-004`) or the communication fault of `SIM_Analog` (`SYS-COM-002`) is set. |
 | Rationale    | Detect a PCS or pump failure. |
 | Parent       | SG-04 |
 | Verification | UT; TT - console injects a stuck pressure |
 | Priority     | Should |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding N-04): with the sensor out of range the measured
+value is clamped and would set a second, misleading fault.
 
 ### 3.5 FLT - fault reactions
 
@@ -367,23 +400,37 @@ hydraulic default, so the plant reaches it anyway when the TCU loses control.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall enter limp-home when any of these faults is set: shift fault (`SYS-SFT-007`), ratio fault (`SYS-SEN-005`), pressure fault (`SYS-SEN-006`), line pressure sensor fault (`SYS-SEN-004`), shaft speed invalid (`SYS-SEN-002`), selector fault while D is selected (`SYS-SEL-002`), communication fault of `SIM_Driver` or `SIM_Speed` (`SYS-COM-002`), bus-off not recovered (`SYS-COM-006`). |
+| Statement    | The TCU shall enter limp-home when any of these faults is set: shift fault (`SYS-SFT-007`), ratio fault (`SYS-SEN-005`), pressure fault (`SYS-SEN-006`), line pressure sensor fault (`SYS-SEN-004`), shaft speed invalid (`SYS-SEN-002`), selector fault while D is selected (`SYS-SEL-002`), communication fault of `SIM_Driver`, `SIM_Speed` or `SIM_Analog` (`SYS-COM-002`), bus-off not recovered (`SYS-COM-006`). |
 | Rationale    | Faults that make gear control unreliable. |
 | Parent       | SG-04 |
 | Verification | UT - one test per entry condition |
 | Priority     | Must |
 | Status       | Approved |
 
+Note: changed on 2026-10-17 (user, system design finding F-14): the communication fault of
+`SIM_Analog` added. `SIM_Analog` carries the line pressure sensor, and a line pressure sensor
+fault already enters limp-home; losing the message now has the same reaction
+(`can_matrix.md` section 6).
+
 ### SYS-FLT-003 - Fault reaction time
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall transmit the limp-home outputs within 100 ms after a fault of `SYS-FLT-002` is set. |
+| Statement    | The TCU shall transmit the limp-home outputs within 100 ms after a fault of `SYS-FLT-002` is set. For a fault that is set while the TCU is in bus-off (`SYS-COM-006`), including the bus-off fault and the communication faults of `SYS-COM-002`, the TCU shall switch the red LED ON within 100 ms and transmit the limp-home outputs as soon as the bus is available again. |
 | Rationale    | Bounded reaction time. |
 | Parent       | SG-04 |
 | Verification | TT - timestamp of the fault injection vs. first limp-home `TCU_Actuators` frame |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding F-10): during bus-off the TCU cannot
+transmit; the plant applies the hydraulic default after 50 ms (`SIM-PLT-004`), which gives
+the same gear and pressure as limp-home.
+
+Note: changed on 2026-10-17 (user, system design finding N-06): during a bus-off nothing is received, so
+the communication faults of the plant messages (30 ms, `can_matrix.md` section 2) are set
+long before the bus-off fault (1000 ms). A bus outage longer than 30 ms therefore enters
+limp-home through the communication faults; the exception applies to them as well.
 
 ### SYS-FLT-004 - Limp-home latch
 
@@ -424,14 +471,27 @@ Note: overtemperature is a warning only; it does not limit the gear or the line 
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall store every fault of this document as a DTC with its status, readable with UDS `19` and clearable with UDS `14`. |
-| Rationale    | Diagnostics after the event. |
+| Statement    | The TCU shall keep one DTC per fault of `can_matrix.md` section 3.6 with the status bits testFailed (bit 0: the fault is currently set) and confirmedDTC (bit 3: the fault has been set since the last clear), report them with UDS `19 01` and `19 02` (status availability mask 0x09) and clear them with UDS `14 FF FF FF`. The DTC memory is volatile: it is cleared by a power cycle. While DTC setting is off (`85 02`), the status bits are not updated. `14` does not change the mode, the fault bits or the outputs; a fault that is still present sets its DTC again. |
+| Rationale    | Diagnostics after the event. Volatile because only the SBL may write flash (DC-04, `SYS-BOOT-004`) and the application has no non-volatile memory. Clearing DTCs must not leave limp-home (`SYS-FLT-004`). |
 | Parent       | - |
-| Verification | TT - tester reads DTCs after a fault injection |
-| Priority     | Could |
+| Verification | TT - tester reads DTCs after a fault injection, clears them, and reads them again with the fault still present and after it has gone |
+| Priority     | Should |
 | Status       | Approved |
 
 Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.FaultBits`.
+
+### SYS-FLT-008 - Fault recovery
+
+| Attribute    | Value |
+|--------------|-------|
+| Statement    | A fault that enters limp-home (`SYS-FLT-002`) shall stay set until the next power cycle, except the selector fault, which clears as stated in `SYS-SEL-002`. The oil temperature sensor fault shall clear when OilTempVoltage has been within 200 .. 4800 mV for 100 ms; the oil overtemperature fault shall clear when the oil temperature is at or below 130 degC. |
+| Rationale    | Defined content of `TCU_Status.FaultBits`, of the fault lamp and of the DTC status bit testFailed (`SYS-FLT-007`). Faults behind limp-home stay visible with the latched mode (`SYS-FLT-004`); the warnings recover with their cause. |
+| Parent       | SG-04 |
+| Verification | UT - one test per fault; TT - inject and remove the oil temperature sensor fault |
+| Priority     | Must |
+| Status       | Approved |
+
+Note: added on 2026-10-17 (user, system design finding F-11).
 
 ### 3.6 COM - CAN communication
 
@@ -457,16 +517,24 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 | Priority     | Must |
 | Status       | Approved |
 
+Note: the timeout of every received message is monitored from the start of the application;
+until the first reception of a message, the substitute values of its signals apply. A TCU
+started without the plant model therefore enters limp-home through the communication faults
+(`SYS-FLT-002`). Added on 2026-10-17 (user, system design finding F-09).
+
 ### SYS-COM-003 - Alive counter
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | Every cyclic message of `can_matrix.md` shall contain a 4-bit alive counter incremented by 1 (mod 16) per transmission. A received message whose counter did not change, or jumped by more than 2, shall be ignored; 3 consecutive ignored messages are treated as a timeout (`SYS-COM-002`). |
+| Statement    | Every cyclic message of `can_matrix.md` shall contain a 4-bit alive counter incremented by 1 (mod 16) per transmission. A received message whose counter did not change, or jumped by more than 2, compared with the last received message of the same ID (ignored or not), shall be ignored; 3 consecutive ignored messages are treated as a timeout (`SYS-COM-002`). |
 | Rationale    | Detect a frozen sender. |
 | Parent       | SG-04 |
 | Verification | UT; TT - console freezes a counter |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding N-05): with the last received message as reference,
+a single jump ignores one message and the following messages are accepted again.
 
 ### SYS-COM-004 - Transmission
 
@@ -479,22 +547,29 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 | Priority     | Must |
 | Status       | Approved |
 
+Note: before control is active, the TCU transmits neither `TCU_Actuators` (`SYS-ACT-004`) nor
+`TCU_Status`. Added on 2026-10-17 (user, system design finding F-18).
+
 ### SYS-COM-005 - Communication control
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall support stopping and restarting the transmission of `TCU_Actuators` and `TCU_Status` with UDS `28` (CommunicationControl). |
+| Statement    | The TCU shall support stopping and restarting the transmission of `TCU_Actuators` and `TCU_Status` with UDS `28` (CommunicationControl): `28 01 01` (enableRxAndDisableTx) stops the transmission, `28 00 01` (enableRxAndTx) restarts it. The reception of `SIM_Driver`, `SIM_Speed` and `SIM_Analog` is not stopped. |
 | Rationale    | Free the bus before reprogramming. |
 | Parent       | - |
 | Verification | TT |
 | Priority     | Must |
 | Status       | Approved |
 
+Note: changed on 2026-10-17 (user, system design finding F-01). The programming sequence used
+`28 03 01` (disableRxAndTx), which also stops the reception; `SYS-DIA-004` then evaluated the
+programming preconditions on stale inputs.
+
 ### SYS-COM-006 - Bus-off
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | After a bus-off, the TCU shall try to recover; if the bus is not back within 1000 ms, it shall set the bus-off fault. |
+| Statement    | After a bus-off, the TCU shall try to recover; if the bus is not back within 1000 ms, it shall set the bus-off fault and continue to try to recover. |
 | Rationale    | Defined behaviour on a bus failure. |
 | Parent       | SG-04 |
 | Verification | TT - short CANH/CANL briefly |
@@ -531,12 +606,15 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall make control active within 500 ms after reset, including the PBL application check. |
+| Statement    | The TCU shall make control active within 500 ms after reset, including the PBL application check, also when no message of the plant model is received. |
 | Rationale    | Fast availability after power-on. |
 | Parent       | SG-04 |
 | Verification | TT |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding F-09). Without plant messages,
+control becomes active with the limp-home outputs (`SYS-COM-002`, `SYS-FLT-002`).
 
 ### SYS-STA-002 - Watchdog
 
@@ -549,18 +627,26 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 | Priority     | Must |
 | Status       | Approved |
 
+Note: the PBL and the SBL have no watchdog in v1. A hang in the bootloader is recovered by a
+power cycle; the outputs stay in the hydraulic default meanwhile (`SYS-BOOT-008`). Added on
+2026-10-17 (user, system design finding F-15).
+
 ### 3.9 HMI - fault lamp and debug output
 
 ### SYS-HMI-001 - Fault lamp
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The TCU shall command FaultLamp = ON while it is in limp-home or while any fault of section 3.5 requires it, and shall also drive the red LED of the board with the same value. |
+| Statement    | The TCU shall command FaultLamp = ON while it is in limp-home, while the selector fault (`SYS-SEL-002`) is set, or while any fault of section 3.5 requires it, and shall also drive the red LED of the board with the same value. |
 | Rationale    | Driver warning, visible on the console and on the board. |
 | Parent       | SG-04 |
 | Verification | TT |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding N-01): the selector fault in P, R or N is not a
+limp-home condition, but the vehicle cannot drive while the position is treated as N; the
+lamp warns the driver and goes OFF when the fault clears.
 
 ### SYS-HMI-002 - Debug output
 
@@ -590,7 +676,7 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The application shall support the services `10` (sessions 01, 02, 03), `11` (01), `22`, `27`, `28`, `31`, `3E` and `85`, with the sessions and security levels of `reprogramming.md` section 3. |
+| Statement    | The application shall support the services `10` (sessions 01, 02, 03), `11` (01), `14`, `19` (01, 02), `22`, `27`, `28`, `31`, `3E` and `85`, with the sessions and security levels of `reprogramming.md` section 3. `14` and `19` are available in the default and extended sessions without security access (`SYS-FLT-007`). |
 | Rationale    | Diagnostic access and entry into programming. |
 | Parent       | - |
 | Verification | TT - tester script per service, including negative responses |
@@ -601,12 +687,15 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When no request is received for S3 = 5000 ms in a non-default session, the TCU shall return to the default session and undo the effects of `28` and `85`. |
+| Statement    | When no request is received for S3 = 5000 ms in a non-default session, the TCU shall return to the default session. Every return to the default session (`10 01` or S3 timeout) shall undo the effects of `28` and `85`. |
 | Rationale    | ISO 14229 S3 timer; the ECU recovers when the tester disappears. |
 | Parent       | - |
 | Verification | TT |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding N-08): `10 01` undoes `28` and `85` as well, as
+ISO 14229-1 requires when the default session is entered.
 
 ### SYS-DIA-004 - Programming preconditions
 
@@ -636,12 +725,17 @@ Note: needs `Dem` (backlog). Until then, faults are visible only in `TCU_Status.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | After reset, the PBL shall start the application only if no programming request is pending and the application image header and CRC32 (`reprogramming.md` section 6) are valid. |
+| Statement    | After reset, the PBL shall start the application only if no programming request is pending and the application image header (magic, `header_crc32`, `hw_id`, `min_pbl_version`) and the image CRC32 (`reprogramming.md` section 6) are valid. |
 | Rationale    | Never run a corrupted or incomplete image. |
 | Parent       | SG-06 |
 | Verification | TT - flash an image with a wrong CRC |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding F-04): `hw_id` and
+`min_pbl_version` are checked at every start as well, with the same rules as
+checkProgrammingDependencies (`reprogramming.md` section 11), so that an image rejected by
+the SBL can never be started.
 
 ### SYS-BOOT-002 - No valid application
 
@@ -695,23 +789,32 @@ programming request is stored in no-init RAM.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | The SBL shall refuse to erase or write any address outside the application area and the boot info area of the memory map (`reprogramming.md` section 5). The PBL can be updated only with a debugger. |
+| Statement    | The SBL shall refuse to erase (`31 01 FF 00`) or write (`34`) any address outside the application area and the boot info area of the memory map (`reprogramming.md` section 5) with NRC `31`. The PBL can be updated only with a debugger. |
 | Rationale    | The PBL must always survive. |
 | Parent       | SG-06 |
-| Verification | TT - `34` to a PBL address returns NRC `31` |
+| Verification | TT - `34` and eraseMemory to a PBL address return NRC `31` |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding F-05): eraseMemory named explicitly.
 
 ### SYS-BOOT-007 - Interrupted programming
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | If programming is interrupted at any step (reset, power loss, tester stops), the next reset shall end in the PBL (`SYS-BOOT-002`) and a full new programming sequence shall succeed. |
+| Statement    | If programming is interrupted at any step (reset, power loss, tester stops), the next reset shall start the unchanged previous application, start the new application if it has already been accepted (`SYS-BOOT-015`), or end in the PBL default session (`SYS-BOOT-002`), and a full new programming sequence shall succeed. |
 | Rationale    | No bricked ECU. |
 | Parent       | SG-06 |
 | Verification | TT - tester aborts at every step of the sequence |
 | Priority     | Must |
 | Status       | Approved |
+
+Note: changed on 2026-10-17 (user, system design finding N-10). Interrupted before the erase (steps 5 .. 12
+of `reprogramming.md` section 2), the application area is unchanged and the PBL starts the
+previous application (`SYS-BOOT-001`). From the erase on, the application header sector stays
+erased until the application has been accepted (`SYS-BOOT-015`), so the PBL stays in the
+default session. Interrupted after the positive response to `31 01 FF 01` (step 19), the new
+application has been accepted and starts.
 
 ### SYS-BOOT-008 - Outputs in the bootloader
 
@@ -728,8 +831,8 @@ programming request is stored in no-init RAM.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | In the programming session, when no request is received for S3 = 5000 ms and the application is valid, the bootloader shall reset the MCU. |
-| Rationale    | Return to the application when the tester disappears before erasing. |
+| Statement    | In the programming session, when no request is received for S3 = 5000 ms, the bootloader shall reset the MCU. |
+| Rationale    | Leave the programming session when the tester disappears. After the reset the PBL starts a valid application (`SYS-BOOT-001`) or stays in the default session (`SYS-BOOT-002`); the reset also discards the SBL in RAM and the unlocked security state. |
 | Parent       | - |
 | Verification | TT |
 | Priority     | Must |
@@ -796,7 +899,7 @@ reset (`SYS-ACT-004`), so the plant applies the hydraulic default for that time.
 
 | Attribute    | Value |
 |--------------|-------|
-| Statement    | When the application accepts `10 02` (`SYS-DIA-004`), it shall send the positive response `50 02` and then perform a software reset within 20 ms after the response has been transmitted. The application shall not store any programming request across the reset. |
+| Statement    | When the application accepts `10 02` (`SYS-DIA-004`), it shall send the positive response `50 02` and then perform a software reset within 20 ms after the response has been transmitted. Between the response and the reset, the application shall not respond to any request. The application shall not store any programming request across the reset. |
 | Rationale    | Simple hand-over: after the reset the PBL enters the programming session only through the boot window (`SYS-BOOT-011`), on the tester's repeated `10 02`. The preconditions of `SYS-DIA-004` (standstill, P, valid speed) still protect `SG-05` on this path. |
 | Parent       | SG-05 |
 | Verification | TT - `10 02` at standstill in P: `50 02` from the application, reset, `50 02` from the PBL |
@@ -805,6 +908,25 @@ reset (`SYS-ACT-004`), so the plant applies the hydraulic default for that time.
 
 Note: the tester sends `10 02` on 0x7E1 every 5 ms after the application's `50 02` until the
 PBL responds `50 02` (`reprogramming.md` section 9).
+
+Note: changed on 2026-10-17 (user, system design finding F-08): the application and the PBL
+send the same `50 02`; with the application silent until its reset, the next `50 02` that
+the tester receives is the PBL's.
+
+### SYS-BOOT-015 - Application header written last
+
+| Attribute    | Value |
+|--------------|-------|
+| Statement    | The SBL shall program the flash sector that holds the application header (0x0001_4000 .. 0x0001_5FFF, `reprogramming.md` section 5) only after checkMemory (`31 01 02 02`) and checkProgrammingDependencies (`31 01 FF 01`) of the application have both passed, and before it sends the positive response to `31 01 FF 01`. If either fails, that sector shall stay erased. |
+| Rationale    | An image that the bootloader has not accepted must never start (`SG-06`), also when its own header and CRC are consistent (e.g. the tester's CRC does not match the intended image) and also when programming is interrupted after the download but before the checks. |
+| Parent       | SG-06 |
+| Verification | TT - wrong CRC at checkMemory, then `11 01`: the PBL stays in the default session; reset after step 16: the PBL stays in the default session |
+| Priority     | Must |
+| Status       | Approved |
+
+Note: added on 2026-10-17 (user, system design finding F-04). Changed on 2026-10-17 (user, system design finding
+N-10): instead of erasing the header sector after a failed check, the SBL writes it last,
+which also covers an interruption between the download and the checks.
 
 ## 4. Open questions
 
@@ -815,3 +937,8 @@ PBL responds `50 02` (`reprogramming.md` section 9).
 | 3 | Overtemperature: warning only, or also limit gear / pressure? | SYS-FLT-006 | Warning only. Closed (user, 2026-10-17). |
 | 4 | All `[NC: ...]` values: confirm or change | all | All values confirmed as proposed. Closed (user, 2026-10-17). |
 | 5 | MCXN947 reference manual not available: RAM content after reset, ROM RAM usage and erased-flash read behaviour are unknown. Decision (user, 2026-10-04): no board experiment; use the robust design `SYS-BOOT-011`, `-013`; no state is kept in RAM across a reset (`SYS-BOOT-003` and `-012` deleted, user, 2026-10-17). | SYS-BOOT | closed |
+| 6 | `SYS-FLT-007` needs `19` / `14`, but `SYS-DIA-002` did not list them | SYS-FLT-007, SYS-DIA-002 | Add `14`, `19 01` / `19 02` to `SYS-DIA-002`; one DTC per fault bit (`can_matrix.md` 3.6); volatile DTC memory; `14` does not leave limp-home. Closed (user, 2026-10-17). |
+| 7 | `SYS-BOOT-009`: behaviour on S3 timeout when the application is invalid | SYS-BOOT-009 | Always reset; the PBL start-up decision then applies. Closed (user, 2026-10-17). |
+| 8 | `SYS-FLT-007` was `Could` while its services are in the `Must` requirement `SYS-DIA-002` | SYS-FLT-007 | Priority raised to `Should`. Closed (user, 2026-10-17). |
+| 9 | System design findings F-01 .. F-18 (TASK-026 plan): communication control sub-function, shift monitoring outside D and near standstill, rejected images, start-up values, bus-off reaction, fault recovery, reverse lockout with invalid speed, `SIM_Analog` timeout, bootloader watchdog, `TCU_Status` before control active | SYS-SEL-001, -004, -005, SYS-SFT-007, SYS-SEN-002, -005, SYS-FLT-002, -003, SYS-COM-002, -004, -005, -006, SYS-STA-001, -002, SYS-BOOT-001, -006, -014; new SYS-FLT-008, SYS-BOOT-015 | Changed as noted at each requirement; `can_matrix.md` 1.2, `reprogramming.md` 0.4, `system_context.md` 0.2. Closed (user, 2026-10-17). |
+| 10 | System design findings N-01 .. N-11 (`docs/architecture/system/system_design.md` section 10.2): lamp on selector fault, pressure plausibility with a sensor fault, alive counter reference, faults during bus-off, cold-oil start-up instant, `10 01` and `28` / `85`, interrupted programming, gear at drive engagement over the limit | SYS-HMI-001, SYS-SEN-006, SYS-COM-003, SYS-FLT-003, SYS-SFT-006, -008, SYS-SEL-005, SYS-DIA-003, SYS-BOOT-007, -015 | Changed as noted at each requirement; `can_matrix.md` 1.3, `reprogramming.md` 0.5. Closed (user, 2026-10-17). |

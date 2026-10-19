@@ -1,0 +1,60 @@
+@startuml cmp_system_interfaces
+title System interfaces - logical view (TCU as one black box, I-01 .. I-12)
+
+left to right direction
+
+actor "Console user" as User
+package "Host tools (Pi5)" {
+  component "Plant model" as Plant
+  component "UDS tester" as Tester
+  component "Console" as Console
+}
+
+rectangle "CAN path: can0 / slcand (I-10), SLCAN over USB VCOM (I-09), gateway FRDM-MCXN236, CAN bus (I-08)\n<<transparent>> every frame forwarded unchanged, no knowledge of xAT messages or UDS (DC-05, SIM-GW-001)" as Path {
+  interface "I-01 SIM_Driver 0x100\nSelector, Brake, Throttle, AliveCtr\n10 ms, RX timeout 30 ms" as I01
+  interface "I-02 SIM_Speed 0x101\nInputShaftSpeed, OutputShaftSpeed, AliveCtr\n10 ms, RX timeout 30 ms" as I02
+  interface "I-03 SIM_Analog 0x102\nOilTempVoltage, LinePressVoltage, AliveCtr\n10 ms, RX timeout 30 ms" as I03
+  interface "I-04 TCU_Actuators 0x200\nSS_A, SS_B, RLS, SLS, FaultLamp, PCS_Duty, AliveCtr\n10 ms (plant timeout 50 ms, SIM-PLT-004)" as I04
+  interface "I-05 TCU_Status 0x201\nGearActual, GearTarget, Mode, SelectorState, ShiftInProgress,\nVehicleSpeed, FaultBits, OilTemp, AliveCtr; 100 ms" as I05
+  interface "I-06 DIAG_PhysReq 0x7E1, DIAG_FuncReq 0x7DF\nUDS over ISO-TP; 0x7DF single frame, only 3E 80" as I06
+  interface "I-07 DIAG_Resp 0x7E9\nUDS over ISO-TP; padding 0xCC, BS 0, STmin 0 ms" as I07
+}
+
+interface "I-11 debug status line, every 500 ms\nselector, gear, vehicle speed, mode, fault bits\n(debug UART, MCU-Link VCOM)" as I11
+interface "I-12 red LED on the TCU board\nsame value as FaultLamp" as I12
+
+component "TCU\nFRDM-MCXN947\n(black box:\napplication, PBL, SBL)" as TCU
+
+User --> Console : I-14 keyboard / terminal
+Console --> Plant : I-15 driver inputs, injected faults
+
+Plant --> I01
+Plant --> I02
+Plant --> I03
+I01 --> TCU
+I02 --> TCU
+I03 --> TCU
+
+Plant <-- I04
+Plant <-- I05
+I04 <-- TCU
+I05 <-- TCU
+
+Tester --> I06
+I06 --> TCU
+Tester <-- I07
+I07 <-- TCU
+
+Console <.. I04 : display (SIM-CON-001)
+Console <.. I05 : display (SIM-CON-001)
+Console <-- I11 : read in a Pi5 terminal
+I11 <-- TCU
+User <-- I12 : light
+I12 <-- TCU
+
+note bottom of TCU
+Covers: SYS-COM-001, SYS-COM-004, SYS-DIA-001, SYS-HMI-001, SYS-HMI-002,
+SIM-GW-001, SIM-CON-001, SIM-CON-002, SIM-TST-004
+Content and timing of I-01 .. I-07: can_matrix sections 2, 3, 5.
+end note
+@enduml

@@ -347,3 +347,297 @@ with a grep script).
 ### Verification
 
 Documentation and Claude configuration only; no build or test needed.
+
+## 2026-10-17: Spec findings before the system design (spec update)
+
+### Summary
+
+Findings from preparing TASK-026 (system design), resolved with the user:
+
+- `system_requirements.md` (v0.2):
+  - SYS-FLT-007: one DTC per fault bit, status bits testFailed / confirmedDTC, `19 01` /
+    `19 02` / `14 FF FF FF`, volatile DTC memory (the application cannot write flash,
+    DC-04), `14` does not leave limp-home; priority `Could` -> `Should`.
+  - SYS-DIA-002: `14` and `19` (01, 02) added, default and extended session, no security.
+  - SYS-BOOT-009: the bootloader always resets on S3 timeout in the programming session;
+    the PBL start-up decision then applies.
+  - Open questions 6 .. 8 added and closed.
+- `can_matrix.md` (v1.1): DTC column in the `FaultBits` table (section 3.6).
+- `sim_requirements.md` (v0.2): SIM-TST-003 reads and clears DTCs.
+- `traceability.md` (v0.2): section 3 no longer cites the deleted SYS-BOOT-003 / -012;
+  SIM-TST-003 supports SYS-FLT-007.
+- `backlog.md`: new TASK-026 (system design, PlantUML); TASK-018 depends on it; TASK-025
+  also covers the `Dcm` services `14` / `19` and depends on TASK-021.
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).
+
+## 2026-10-17: Spec findings from the system design (F-01 .. F-18, spec update)
+
+### Summary
+
+Findings from planning TASK-026, resolved with the user before any diagram is written
+(decision: fix the specs first). Proposals of the approved TASK-026 plan applied:
+
+- `system_requirements.md` (v0.3):
+  - SYS-COM-005 (F-01): stop with `28 01 01`, restart with `28 00 01`; reception continues.
+  - SYS-SEL-005, SYS-SFT-007, SYS-SEN-005, term "shift in progress" (F-02, F-03): shifts and
+    shift / ratio monitoring only in D; in P / R / N the prepared pattern follows directly
+    (only `SYS-SFT-005` applies); a shift is complete at OutputShaftSpeed <= 200 rpm.
+  - SYS-BOOT-001 (F-04): the start check also covers `hw_id` and `min_pbl_version`; new
+    SYS-BOOT-015: the SBL erases the application header sector after a failed `0202` /
+    `FF01`.
+  - SYS-BOOT-006 (F-05): eraseMemory named. SYS-BOOT-014 (F-08): the application is silent
+    between its `50 02` and the reset.
+  - SYS-SEL-001, SYS-COM-002, SYS-STA-001 (F-09): selector N until the first accepted
+    position; timeouts monitored from the application start with substitute values until the
+    first reception; control active within 500 ms also without plant messages.
+  - SYS-FLT-003, SYS-COM-006 (F-10): bus-off: red LED ON within 100 ms, limp-home outputs when
+    the bus is back, recovery continues.
+  - New SYS-FLT-008 (F-11): limp-home faults stay set until the power cycle (selector fault:
+    own rule); oil temperature sensor fault and overtemperature recover. SYS-SEN-002: set on
+    the first invalid value.
+  - SYS-SEL-004 (F-13): RLS stays ON only while R remains selected and the speed is valid.
+  - SYS-FLT-002 (F-14): communication fault of `SIM_Analog` enters limp-home.
+  - SYS-STA-002 note (F-15): no watchdog in the PBL / SBL in v1. SYS-COM-004 note (F-18): no
+    `TCU_Status` before control active. Open question 9 added and closed.
+- `can_matrix.md` (v1.2): section 5 functional addressing only for `3E 80` (F-16); section 6
+  fault bits per timeout, `SIM_Analog` timeout -> limp-home, substitute values until the first
+  reception (F-12, F-14).
+- `reprogramming.md` (v0.4): step 4 `28 01 01` / `68 01`; entry with an invalid application
+  (F-07); section 3 services per part and session, `10 01` in a bootloader programming
+  session resets, lockout rule for level 0x01 (F-06, F-17); section 9 entry note; section 11
+  version comparison and header invalidation, new 11.1 request sequence and address rules
+  (F-05). Open question 5 added and closed.
+- `system_context.md` (v0.2): mode "Programming" renamed "Bootloader" (PBL start-up, default
+  and programming sessions, SBL); Init sends no `TCU_Status` (F-18).
+- `traceability.md` (v0.3): SYS-FLT-008 under SG-04, SYS-BOOT-015 under SG-06 and SIM-TST-002.
+- `TASK-026.md` section 2: pointer to this update.
+
+### Decisions
+
+- F-14: the stricter option was taken (a `SIM_Analog` timeout enters limp-home like a line
+  pressure sensor fault); consequently the `SIM_Analog` communication fault is latched by
+  SYS-FLT-008 and is not in its list of recovering faults.
+- F-06: `10 01` in a PBL / SBL programming session answers `50 01` and resets (the plan named
+  `10 01` as supported without stating its effect).
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).
+
+## 2026-10-17: TASK-026 system design (PlantUML)
+
+### Summary
+
+Phase B of TASK-026. The plan was approved by the user before any file was written (AC0). It
+runs on the spec baseline of commit `79929ee` (F-01 .. F-18 resolved in Phase A). Documentation
+only: no code, build or unit test.
+
+- `docs/architecture/system/system_design.md` (new). Sections:
+  - purpose and inputs with versions, design rules ("system level only", diagram conventions);
+  - system elements E-01 .. E-15 and interfaces I-01 .. I-17c;
+  - operating modes and the running software part over time;
+  - allocation of all 61 `Approved` SYS and 18 SIM requirements;
+  - scenario catalogue;
+  - coverage: SYS, SG safe states and SIM -> diagrams;
+  - open questions: F-01 .. F-18 resolved, new findings N-01 .. N-11, assumption A-01.
+- `docs/architecture/system/diagrams/`, 43 PlantUML files:
+  - component diagrams `cmp_system_context`, `cmp_system_interfaces`, `cmp_tcu_software_parts`;
+  - the state diagram `stm_tcu_modes` (index of the scenarios);
+  - 39 sequence diagrams `seq_*`: start-up 4, selector 5, shifting 7, faults 8, CAN 4,
+    diagnostics 4, reprogramming 7.
+- The catalogue and coverage tables of `system_design.md` are generated from the `Covers:` header
+  notes of the diagrams, so the two cannot diverge.
+- `docs/architecture/overview.md`: one link to the system design.
+- `backlog.md`: TASK-026 -> DONE.
+
+### Decisions
+
+- SC-BOOT-01 (19 steps) is one file on three pages (`newpage`): application and hand-over, PBL,
+  SBL and restart. The plan's fallback split into two files was not needed, and the catalogue
+  keeps one file per scenario.
+- The TCU is split into its software parts in the boot scenarios and also in SC-STA-01 .. SC-STA-03
+  and SC-DIA-02, because there the running part is the subject.
+- The diagrams draw the updated spec text of Phase A (e.g. `28 01 01` / `68 01`, `SIM_Analog`
+  timeout -> limp-home, mode "Bootloader", entry with an invalid application). No
+  `ASSUMPTION (F-nn)` marker is used.
+
+### Deviations and findings
+
+- SC-COM-04 shows more than the plan's two branches. During a bus-off the 30 ms reception timeouts
+  set the communication faults first, which leads to finding N-06.
+- SC-BOOT-05 separates three interruption windows: before the erase (previous application
+  starts), during erase / download (PBL default session), and after a complete download (the PBL
+  check decides). This leads to finding N-10.
+- New spec findings N-01 .. N-11 are recorded in `system_design.md` section 10.2, each with a
+  proposal. The specs are not changed (AC5); a spec update needs a separate user decision.
+  The two findings of medium severity:
+  - N-06: the SYS-FLT-003 reaction cannot be met for faults set during a bus-off.
+  - N-10: the wording of SYS-BOOT-007; an image after a complete download starts without `0202` /
+    `FF01`.
+- One `ASSUMPTION:` marker is used (A-01 / N-07, SC-SFT-07): the cold-oil start-up check uses
+  the first received oil temperature, not the substitute 80 degC.
+
+### Verification
+
+| AC | Command / check | Result |
+|---|---|---|
+| AC0 | plan approval | approved by the user before any file was written |
+| AC1 | `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc 0 |
+| AC1 | `plantuml -tpng -o <scratchpad> docs/architecture/system/diagrams/*.puml`; every PNG opened and reviewed | rc 0; 45 PNG (SC-BOOT-01 = 3 pages), no error image, largest 2919 x 1784 px (below the 4096 px limit); layout fixes applied to `cmp_system_interfaces`, `cmp_tcu_software_parts`, `stm_tcu_modes` |
+| AC2 | coverage script (scratchpad, not committed) | `AC2 PASSED`, output below |
+| AC3 | `grep -nwE 'CanIf\|PduR\|CanTp\|Dcm\|Dem\|Rte\|SchM\|EcuM\|Os\|Swc[A-Za-z]*\|runnable\|Rte_[A-Za-z_]*' docs/architecture/system/diagrams/*.puml` | no output (rc 1). A wider case-insensitive sweep (task, API, SWC, port, function, ...) with requirement IDs masked was also clean. |
+| AC4 | spot check: every distinct UDS byte string, NRC and value (ms, rpm, bar, degC, km/h, %, KiB, mV) listed from the diagrams and compared with can_matrix, reprogramming, system_requirements and sim_requirements | all values from the specs; NRCs not named by a spec (`31` for an unknown DID, `35`) labelled `(ISO 14229-1)` |
+| AC5 | `git diff --stat 79929ee -- docs/specs/` | empty |
+| AC6 | `overview.md` link, this entry, backlog DONE | done |
+
+AC2 script output:
+
+```
+specs: 61 Approved SYS, 2 Deleted SYS ['SYS-BOOT-003', 'SYS-BOOT-012'], 18 SIM, 6 SG
+diagrams: 43 files, 39 seq_*
+check 1: 61 coverage rows; Approved SYS without any diagram: ['SYS-TIM-002'] (reason given: True)
+check 2: 84 distinct IDs cited in diagrams, invalid or Deleted: none
+check 3: 43 catalogue rows (39 scenarios), all files exist and all files listed: True
+check 4: SG-01 -> ['SC-FLT-02', 'SC-SEL-04']; diagrams naming SG-01: ['SC-FLT-02', 'SC-SEL-04']
+check 4: SG-02 -> ['SC-SEL-05', 'SC-SFT-02', 'SC-SFT-05']; diagrams naming SG-02: ['SC-SEL-05', 'SC-SFT-02', 'SC-SFT-05']
+check 4: SG-03 -> ['SC-SEL-02', 'SC-SEL-03', 'SC-SEL-05']; diagrams naming SG-03: ['SC-SEL-02', 'SC-SEL-03', 'SC-SEL-05']
+check 4: SG-04 -> ['SC-COM-01', 'SC-COM-02', 'SC-COM-04', 'SC-FLT-01', 'SC-FLT-02', 'SC-FLT-03', 'SC-FLT-04', 'SC-FLT-05', 'SC-FLT-06', 'SC-SFT-06', 'SC-STA-03']; diagrams naming SG-04: ['SC-COM-01', 'SC-COM-02', 'SC-COM-04', 'SC-FLT-01', 'SC-FLT-02', 'SC-FLT-03', 'SC-FLT-04', 'SC-FLT-05', 'SC-FLT-06', 'SC-SFT-06', 'SC-STA-03']
+check 4: SG-05 -> ['SC-DIA-04']; diagrams naming SG-05: ['SC-DIA-04']
+check 4: SG-06 -> ['SC-BOOT-03', 'SC-BOOT-04', 'SC-BOOT-05', 'SC-STA-02']; diagrams naming SG-06: ['SC-BOOT-03', 'SC-BOOT-04', 'SC-BOOT-05', 'SC-STA-02']
+check 5: SIM rows 18/18; open questions referenced in diagrams ['N-04', 'N-05', 'N-06', 'N-07', 'N-08', 'N-09', 'N-10', 'N-11']; ASSUMPTION in ['seq_sft_cold_oil.puml'], rows ['A-01']
+
+AC2 PASSED
+```
+
+The checks of the script:
+
+1. every `Approved` SYS has a coverage row, and a diagram or a reason;
+2. every SYS / SIM / SG ID in the diagrams exists and is not `Deleted`;
+3. catalogue rows and files match one to one, titles carry the scenario ID, `@startuml <file name>`,
+   and the `Covers:` header equals the catalogue *Covers* column;
+4. every SG has a safe-state row whose scenarios name the SG;
+5. SIM coverage is complete, every open question referenced in a diagram is defined, and every
+   `ASSUMPTION` is listed.
+
+## 2026-10-17: Spec findings N-01 .. N-11 from the system design (spec update)
+
+### Summary
+
+Findings recorded in `docs/architecture/system/system_design.md` section 10.2 while drawing
+the TASK-026 diagrams, resolved with the user:
+
+- `system_requirements.md` (v0.4):
+  - SYS-HMI-001 (N-01): FaultLamp / red LED ON while the selector fault is set.
+  - SYS-SEN-006 (N-04): pressure plausibility suspended while the line pressure sensor fault
+    or the `SIM_Analog` communication fault is set.
+  - SYS-COM-003 (N-05): the alive counter is compared with the last received message of the
+    same ID, ignored or not.
+  - SYS-FLT-003 (N-06): the bus-off exception covers every fault set while in bus-off,
+    including the communication faults; an outage > 30 ms enters limp-home through them.
+  - SYS-SFT-008 (N-07): "at startup" = first oil temperature received after reset.
+  - SYS-DIA-003 (N-08): every return to the default session (`10 01` or S3) undoes `28` / `85`.
+  - SYS-BOOT-007 (N-10): the next reset starts the unchanged previous application or ends in
+    the PBL default session, or starts the new application once it has been accepted. SYS-BOOT-015 restated: the SBL programs the application header
+    sector only after `0202` and `FF01` passed (header written last) instead of erasing it
+    after a failed check.
+  - SYS-SFT-006, SYS-SEL-005 (N-11): over the 6000 rpm limit, the lowest higher gear within the
+    limit.
+  - Open question 10 added and closed.
+- `can_matrix.md` (v1.3): `SelectorState` = 7 while the selector fault is set (N-02);
+  `OilTemp` = 0xFF while the substitute is used (N-03).
+- `reprogramming.md` (v0.5): step 18 programs the header sector before the positive response;
+  section 11 header-last rule (N-10); section 3 security lockout not kept across a reset,
+  accepted for v1 (N-09). Open question 6 added and closed.
+
+### Decisions (user)
+
+- N-01 lamp ON; N-06 extend the exception; N-09 accept the reset behaviour; N-10 header
+  written last (detailed design in TASK-024). The other findings as proposed.
+
+### Verification
+
+Documentation only. All requirement IDs referenced in `docs/specs/` are defined (checked
+with a grep script).
+
+## 2026-10-17: TASK-026 system design updated for N-01 .. N-11
+
+### Summary
+
+The system design follows the spec update of N-01 .. N-11 (commit `0fcaba6`):
+
+- `system_design.md` 0.2: input versions (system_requirements 0.4, can_matrix 1.3,
+  reprogramming 0.5); section 10.2 lists N-01 .. N-11 as resolved with the decision and the
+  spec location; assumption A-01 removed (section 10.3: none).
+- Diagrams updated (15):
+  - SC-SEL-02: lamp / red LED ON while the selector fault is set, `SelectorState` = 7.
+  - SC-FLT-03, SC-COM-01: `OilTemp` = 0xFF while the substitute is used.
+  - SC-FLT-04: pressure plausibility suspended with the line pressure sensor fault.
+  - SC-COM-02: counter reference = last received message.
+  - SC-COM-04: SYS-FLT-003 exception for faults set in bus-off.
+  - SC-SFT-07: start-up instant from SYS-SFT-008 (no assumption left).
+  - SC-DIA-01: `10 01` undoes `28` / `85`.
+  - SC-BOOT-02: lockout not kept across a reset.
+  - SC-BOOT-01, SC-BOOT-03, SC-BOOT-05, `cmp_tcu_software_parts`: application header sector
+    programmed last (SYS-BOOT-015); SC-BOOT-05 now has the branches before the erase,
+    steps 13 .. 18 and step 19.
+  - SC-SFT-02, SC-SEL-05: lowest higher gear within the 6000 rpm limit.
+
+### Deviations
+
+- While updating SC-BOOT-05, the new SYS-BOOT-007 wording was found to miss the interruption in
+  step 19 (application already accepted). Fixed in the spec commit before it was used
+  (amended into `0fcaba6`; development log entry of the N-01 .. N-11 spec update adjusted).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc = 0 |
+| Render of the 15 changed diagrams to the scratchpad | rc = 0; SC-BOOT-05, SC-SEL-02 and SC-COM-02 (largest changes) viewed, layout correct |
+| AC2 script (coverage, IDs, catalogue, SG, SIM) | `AC2 PASSED`; no open question or `ASSUMPTION` referenced in the diagrams |
+| AC3 grep for software-design names | no match (rc = 1) |
+| `git diff --stat 0fcaba6 -- docs/specs src` | empty |
+
+
+## 2026-10-18: PBL -> SBL hand-over wording and `0301` response timing (spec update)
+
+### Summary
+
+- `reprogramming.md` (v0.6):
+  - Section 8 reworded: no state is kept in RAM across a reset; the PBL -> SBL hand-over at
+    `31 01 03 01` happens without a reset and is not affected. The old text ("no state is
+    passed between the application, PBL and SBL in RAM") contradicted section 1.
+  - Section 11: response to activateSecondaryBootloader. Refusals (`24` / `22`) come from the
+    PBL within P2server; otherwise the PBL sends `7F 31 78`, waits until it is transmitted
+    and starts the SBL, which sends `71 01 03 01 00` within P2*server (5000 ms). Step 11 of
+    section 2 updated.
+  - Open question 7 added and closed.
+- Diagrams: `seq_boot_programming.puml` (SC-BOOT-01 step 11) and `stm_tcu_modes.puml`
+  (transition PBL -> SBL programming session) show `7F 31 78` from the PBL.
+
+### Decisions (user)
+
+- Response pending from the PBL before the SBL starts, instead of an SBL response within
+  P2server: the SBL start-up time is not known yet, and the tester already handles
+  `7F 31 78` (step 13, RB-05).
+- Not covered: an SBL that hangs at start-up stays until a power cycle (open question 7).
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `plantuml -checkonly docs/architecture/system/diagrams/*.puml` | rc = 0 |
+| Render of `stm_tcu_modes` and `seq_boot_programming` to the scratchpad | rc = 0; transition label and step 11 viewed, layout correct |
+| Requirement IDs referenced in `docs/specs/` defined (grep script) | no undefined ID |
+
+## 2026-10-19: System design approved
+
+### Summary
+
+- `docs/architecture/system/system_design.md` (v0.2): status `Draft (for review)` -> `Approved`
+  after the user review. It is now the approved input for the SWC composition (TASK-027).

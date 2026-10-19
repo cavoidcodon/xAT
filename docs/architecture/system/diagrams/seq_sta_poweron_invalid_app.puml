@@ -1,0 +1,49 @@
+@startuml seq_sta_poweron_invalid_app
+title SC-STA-02 - Power-on without a valid application
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+box "TCU"
+participant "PBL" as PBL
+participant "Application\n(not started)" as App
+end box
+
+note over Tester, App
+Covers: SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SYS-BOOT-013, SYS-DIA-005, SIM-PLT-004, SG-06
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+== t0: reset (power-on, watchdog or software reset) ==
+
+alt application area erased
+  PBL -> PBL : header magic not 0x41544178
+else application partially programmed (programming interrupted, SYS-BOOT-007)
+  PBL -> PBL : header or image only partly written,\nreads of interrupted flash phrases may report ECC errors
+else header or image invalid
+  PBL -> PBL : header_crc32 wrong, hw_id not 0x0947_0001,\nmin_pbl_version > PBL version, or image CRC32 wrong
+end
+PBL -> PBL : application check completes without a processor fault\nand treats the application as invalid (SYS-BOOT-013, SYS-BOOT-001)
+PBL -> PBL : stay in the bootloader, default session, no time limit\n(SYS-BOOT-002, reprogramming section 9 row 1; no boot window)
+note right of PBL: the application is never started (SG-06)
+
+loop every 10 ms (SIM-PLT-001)
+  Plant -> PBL : SIM_Driver, SIM_Speed, SIM_Analog (not used by the PBL)
+end
+note over PBL: no TCU_Actuators / TCU_Status (SYS-BOOT-008)
+Plant -> Plant : TCU_Actuators not received for 50 ms (t0 + 50 ms):\nhydraulic default SS_A = SS_B = OFF, PCS_Duty = 0 %,\nRLS = OFF, SLS = OFF, FaultLamp = OFF (SIM-PLT-004)
+
+... any time later (no time limit, SYS-BOOT-002) ...
+
+Tester -> PBL : 22 F1 81
+PBL --> Tester : 62 F1 81 FF FF FF FF
+note right: application software version 0xFFFFFFFF = invalid\n(reprogramming section 4, SYS-DIA-005)
+Tester -> PBL : 22 F1 86
+PBL --> Tester : 62 F1 86 01
+note right: active session 01 = default
+
+note over Tester, PBL
+Safe state of SG-06: the TCU stays in the bootloader and the plant is in the hydraulic default.
+The tester recovers with the entry for an invalid application (reprogramming section 2), see SC-BOOT-05.
+end note
+@enduml

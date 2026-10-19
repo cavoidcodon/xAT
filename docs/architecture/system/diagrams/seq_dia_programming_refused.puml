@@ -1,0 +1,45 @@
+@startuml seq_dia_programming_refused
+title SC-DIA-04 - Programming session refused by the application
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over Tester, TCU
+Covers: SYS-DIA-004, SYS-DIA-002, SIM-TST-002, SIM-TST-004, SG-05
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, default session; the tester runs beside the plant model (SIM-TST-004)
+loop every 10 ms
+  Plant -> TCU : SIM_Driver, SIM_Speed, SIM_Analog
+end
+
+Tester -> TCU : 10 02
+TCU --> Tester : 7F 10 7E
+note right: 10 02 only from the extended session\n(reprogramming section 3)
+
+Tester -> TCU : 10 03
+TCU --> Tester : 50 03 00 32 01 F4
+Tester -> TCU : 31 01 02 03
+TCU --> Tester : 71 01 02 03 <result>
+note right: checkProgrammingPreconditions: 00 = OK, else bit 0 not at standstill,\nbit 1 not in P, bit 2 speed invalid (reprogramming section 11);\nexample at 20 km/h in D: 71 01 02 03 03
+
+alt vehicle moving (>= 2 km/h, e.g. 20 km/h)
+  Plant -> TCU : SIM_Speed: OutputShaftSpeed of 20 km/h
+  Tester -> TCU : 10 02
+  TCU --> Tester : 7F 10 22
+else selector not P
+  Plant -> TCU : SIM_Driver: Selector = 1, 2 or 3
+  Tester -> TCU : 10 02
+  TCU --> Tester : 7F 10 22
+else vehicle speed invalid
+  Plant -> TCU : SIM_Speed: OutputShaftSpeed > 8000 rpm, or SIM_Speed timeout
+  Tester -> TCU : 10 02
+  TCU --> Tester : 7F 10 22
+end
+note right of TCU: conditionsNotCorrect (SYS-DIA-004)
+TCU -> TCU : stays in the application, extended session; control continues
+note over Tester, TCU: Safe state of SG-05: the programming request is rejected. Accepted case: SC-BOOT-01 step 5.
+@enduml

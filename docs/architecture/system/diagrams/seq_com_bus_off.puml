@@ -1,0 +1,61 @@
+@startuml seq_com_bus_off
+title SC-COM-04 - Bus-off of the TCU over the full CAN path
+
+participant "Plant model" as Plant
+participant "can0 / slcand\n(Pi5, SocketCAN)" as Can0
+participant "Gateway\n(FRDM-MCXN236)" as GW
+participant "CAN bus\n500 kbit/s" as Bus
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over Plant, LED
+Covers: SYS-COM-006, SYS-COM-002, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001,
+SIM-GW-001, SIM-GW-003, SIM-PLT-004, SG-04
+The gateway forwards every frame in both directions without filtering or changing it (DC-05, SIM-GW-001).
+end note
+
+note over TCU: control active, mode Normal
+loop every 10 ms
+  Plant -> Can0 : SIM_Driver, SIM_Speed, SIM_Analog
+  Can0 -> GW : SLCAN frames over USB VCOM
+  GW -> Bus : CAN frames 0x100 .. 0x102
+  Bus -> TCU : 0x100 .. 0x102
+  TCU -> Bus : TCU_Actuators 0x200
+  Bus -> GW : 0x200
+  GW -> Can0 : SLCAN frame
+  Can0 -> Plant : TCU_Actuators
+end
+
+== t0: bus failure (e.g. CANH / CANL shorted, SYS-COM-006 verification) ==
+Bus ->x TCU : frames lost
+TCU -> TCU : t0: bus-off; try to recover (SYS-COM-006)
+note right of TCU: during the failure the TCU neither transmits\nnor receives
+GW -> Can0 : SLCAN status flags: error passive / bus-off (SIM-GW-003)
+GW -> GW : bus-off shown on a board LED (SIM-GW-003)
+alt bus back within 30 ms
+  TCU -> TCU : recovered; no reception timeout, no fault
+  TCU -> Bus : TCU_Actuators 0x200 (normal outputs)
+  note right of TCU: the plant receives TCU_Actuators again\nbefore its 50 ms timeout (SIM-PLT-004)
+else bus not back within 30 ms
+  TCU -> TCU : t0 + 30 ms: no SIM_Driver, SIM_Speed, SIM_Analog -> communication faults\n(FaultBits 7, 8, 9) (SYS-COM-002) -> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+  TCU -> LED : ON (SYS-HMI-001)
+  note right of TCU: fault set while in bus-off: red LED ON within 100 ms,\nlimp-home outputs as soon as the bus is back (SYS-FLT-003)
+  ... 50 ms without TCU_Actuators ...
+  Plant -> Plant : t0 + 50 ms: hydraulic default (SIM-PLT-004):\nsame gear (3rd in D) and pressure as limp-home (SYS-FLT-003 note)
+  alt bus back within 1000 ms
+    TCU -> TCU : recovered; no bus-off fault (SYS-COM-006)
+  else bus not back within 1000 ms
+    TCU -> TCU : t0 + 1000 ms: bus-off fault (FaultBits 10, DTC U0001-88) (SYS-COM-006);\ncontinue to try to recover
+    TCU -> LED : ON within 100 ms after the bus-off fault is set (SYS-FLT-003);\nhere already ON from the communication faults
+    ... bus available again ...
+  end
+  TCU -> Bus : TCU_Actuators 0x200: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON
+  note right of TCU: limp-home outputs as soon as\nthe bus is available again (SYS-FLT-003)
+  TCU -> Bus : TCU_Status 0x201: Mode = 1 (Limp-home), FaultBits 7, 8, 9 (and 10) = 1
+  note over Plant, TCU: Safe state of SG-04: limp-home, latched; the fault bits stay set until the next power cycle (SYS-FLT-008).
+end
+Bus -> GW : 0x200, 0x201
+GW -> Can0 : SLCAN frames
+Can0 -> Plant : TCU_Actuators
+Plant -> Plant : uses TCU_Actuators again
+@enduml

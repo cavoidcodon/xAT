@@ -1,0 +1,62 @@
+@startuml seq_sft_upshifts
+title SC-SFT-03 - Upshifts 1 -> 4 while accelerating
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SFT-001, SYS-SFT-003, SYS-SFT-004, SYS-SFT-007, SYS-ACT-001, SYS-ACT-002, SYS-SEN-005,
+SIM-PLT-003, SIM-PLT-006
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Ratios 1st 3.06, 2nd 1.63, 3rd 1.00, 4th 0.70 (system_context section 4.1).
+end note
+
+note over TCU: D in 1st, mode Normal
+User -> Console : throttle
+Console -> Plant : Throttle
+loop every 10 ms
+  Plant -> Plant : vehicle accelerates (SIM-PLT-006)
+  Plant -> TCU : SIM_Driver: Throttle; SIM_Speed: InputShaftSpeed, OutputShaftSpeed
+end
+
+== shift 1 -> 2 ==
+TCU -> TCU : upshift table (vehicle speed, throttle) gives target gear 2 (SYS-SFT-001)
+TCU -> TCU : t1: start shift 1 -> 2, one step (SYS-SFT-003); shift in progress
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = ON (2nd, SYS-ACT-001),\nPCS_Duty from the shift pressure profile (SYS-ACT-002)
+TCU -> Plant : TCU_Status: GearTarget = 2, ShiftInProgress = 1
+Plant -> Plant : engages 2nd: InputShaftSpeed moves from ratio 3.06 to 1.63 over 400 ms (SIM-PLT-003)
+note over TCU: no ratio plausibility check while a shift is in progress (SYS-SEN-005)
+loop every 10 ms
+  Plant -> TCU : SIM_Speed: InputShaftSpeed, OutputShaftSpeed
+end
+... InputShaftSpeed / OutputShaftSpeed within +/- 5 % of 1.63 for 100 ms ...
+TCU -> TCU : t2: shift complete (SYS-SFT-007)
+note right of TCU: t2 - t1 < 800 ms, otherwise shift fault (SC-SFT-06)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = ON, PCS_Duty from the table\n(throttle, gear) (SYS-ACT-002)
+TCU -> Plant : TCU_Status: GearActual = 2, ShiftInProgress = 0
+
+== shift 2 -> 3 ==
+opt the schedule asks for 3rd earlier than 2000 ms after t2
+  TCU -> TCU : shift not started yet (SYS-SFT-004)
+end
+... >= 2000 ms after t2 (SYS-SFT-004) ...
+TCU -> TCU : target gear 3: start shift 2 -> 3
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF (3rd), shift pressure profile
+Plant -> Plant : ratio 1.63 -> 1.00 over 400 ms
+... ratio within +/- 5 % of 1.00 for 100 ms ...
+TCU -> TCU : t3: shift complete
+TCU -> Plant : TCU_Actuators: PCS_Duty from the table
+
+== shift 3 -> 4 ==
+... >= 2000 ms after t3 (SYS-SFT-004) ...
+TCU -> TCU : target gear 4: start shift 3 -> 4
+TCU -> Plant : TCU_Actuators: SS_A = ON, SS_B = OFF (4th), shift pressure profile
+Plant -> Plant : ratio 1.00 -> 0.70 over 400 ms
+... ratio within +/- 5 % of 0.70 for 100 ms ...
+TCU -> TCU : t4: shift complete
+TCU -> Plant : TCU_Actuators: PCS_Duty from the table; TCU_Status: GearActual = 4
+
+note over Plant, TCU: Limp-home outputs are not delayed by SYS-SFT-004 (SYS-SFT-004 note, SYS-FLT-001 note).
+@enduml

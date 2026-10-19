@@ -1,0 +1,35 @@
+@startuml seq_flt_line_pressure_sensor
+title SC-FLT-04 - Line pressure sensor out of range: limp-home
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-SEN-004, SYS-SEN-006, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Valid electrical range 200 .. 4800 mV (can_matrix section 4).
+end note
+
+note over TCU: control active, mode Normal
+User -> Console : force LinePressVoltage (0 mV or 5000 mV) (SIM-CON-003)
+Console -> Plant : sensor voltage forced
+Plant -> TCU : SIM_Analog: LinePressVoltage outside 200 .. 4800 mV (t0)
+loop every 10 ms
+  Plant -> TCU : SIM_Analog: LinePressVoltage outside 200 .. 4800 mV
+end
+... longer than 100 ms ...
+TCU -> TCU : t0 + 100 ms: line pressure sensor fault (FaultBits 4, DTC P0840-1C)\n(SYS-SEN-004) -> enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
+note right of TCU: <= 100 ms after the fault is set (SYS-FLT-003)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 4 = 1
+note over Plant, TCU: Safe state of SG-04: limp-home.
+note over TCU: pressure plausibility suspended while the line pressure\nsensor fault is set: no pressure fault (bit 3) (SYS-SEN-006)
+
+User -> Console : remove the injection
+Plant -> TCU : SIM_Analog: LinePressVoltage within 200 .. 4800 mV
+TCU -> TCU : the fault stays set until the next power cycle (SYS-FLT-008),\nlimp-home stays latched (SYS-FLT-004)
+@enduml

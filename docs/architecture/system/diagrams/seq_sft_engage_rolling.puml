@@ -1,0 +1,35 @@
+@startuml seq_sft_engage_rolling
+title SC-SFT-02 - Drive engagement N -> D while rolling
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SFT-006, SYS-SFT-005, SYS-SFT-001, SYS-SEL-005, SIM-PLT-002, SG-02
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Ratios 3.06 / 1.63 / 1.00 / 0.70, final drive 3.23, tyre radius 0.31 m (system_context section 4.1).
+end note
+
+note over TCU: mode Normal, selector N, vehicle coasting above standstill (example 100 km/h)
+Plant -> TCU : SIM_Driver: Selector = 2 (N), Throttle;\nSIM_Speed: OutputShaftSpeed (100 km/h)
+TCU -> TCU : prepared gear = schedule gear within the 6000 rpm limit\n(SYS-SEL-005, SYS-SFT-005)
+note right of TCU: prediction = OutputShaftSpeed x ratio of the new gear;\nat 100 km/h 1st gives about 8460 rpm > 6000 rpm,\nso no gear below 2nd (SYS-SFT-005 verification)
+TCU -> Plant : TCU_Actuators: SS_A / SS_B of the prepared gear
+note right of TCU: if the schedule gear exceeds the limit, the lowest higher gear\nwhose prediction is <= 6000 rpm is selected (SYS-SFT-006)
+
+User -> Console : select D
+Console -> Plant : selector D
+Plant -> Plant : lever in D: engages the prepared gear at once (SIM-PLT-002)
+Plant -> TCU : SIM_Driver: Selector = 3 (D)
+... 50 ms unchanged (SYS-SEL-001) ...
+TCU -> TCU : D selected above standstill -> command the gear of the shift schedule\nwithin the limit of SYS-SFT-005 (SYS-SFT-006, SYS-SFT-001)
+TCU -> Plant : TCU_Actuators: same SS_A / SS_B (prepared gear taken over, no shift)
+TCU -> Plant : TCU_Status: SelectorState = 3 (D), GearTarget = prepared gear (2, 3 or 4)
+
+note over Plant, TCU
+Safe state of SG-02: no gear whose predicted input shaft speed exceeds 6000 rpm is engaged.
+Later shifts follow SYS-SFT-001 .. SYS-SFT-004 (SC-SFT-03, SC-SFT-04).
+end note
+@enduml

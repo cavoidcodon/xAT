@@ -1,0 +1,37 @@
+@startuml seq_sft_overspeed_refused
+title SC-SFT-05 - Downshift refused by the overspeed protection
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SFT-005, SYS-SFT-003, SYS-SFT-001, SG-02
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Ratios 1st 3.06, 2nd 1.63 (system_context section 4.1); downshift speed limit 6000 rpm.
+end note
+
+note over TCU: D in 2nd at 100 km/h, mode Normal
+User -> Console : kick-down, throttle 100 %
+Console -> Plant : Throttle = 100 %
+Plant -> TCU : SIM_Driver: Throttle = 100 %; SIM_Speed: InputShaftSpeed, OutputShaftSpeed
+TCU -> TCU : downshift table gives target gear 1 (SYS-SFT-001)
+TCU -> TCU : prediction for 1st = max(OutputShaftSpeed x 3.06,\nInputShaftSpeed x 3.06 / 1.63) = about 8460 rpm > 6000 rpm
+TCU -> TCU : downshift 2 -> 1 not started, 2nd kept (SYS-SFT-005)
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = ON (2nd unchanged)
+note over Plant, TCU: Safe state of SG-02: the current gear is kept.
+
+opt OutputShaftSpeed frozen while InputShaftSpeed is valid
+  TCU -> TCU : the InputShaftSpeed term still gives > 6000 rpm -> refused\n(SYS-SFT-005 verification)
+end
+
+loop while the prediction for 1st is > 6000 rpm
+  Plant -> TCU : SIM_Speed: speeds (vehicle slows down)
+  TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = ON (2nd)
+end
+... prediction for 1st <= 6000 rpm ...
+TCU -> TCU : downshift 2 -> 1 may start (target still 1, SYS-SFT-004 elapsed)
+TCU -> Plant : TCU_Actuators: SS_A = ON, SS_B = ON (1st), shift pressure profile
+Plant -> Plant : ratio 1.63 -> 3.06 over 400 ms (SIM-PLT-003)
+@enduml

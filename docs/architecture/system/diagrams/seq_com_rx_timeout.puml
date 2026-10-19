@@ -1,0 +1,52 @@
+@startuml seq_com_rx_timeout
+title SC-COM-01 - Reception timeout of SIM_Driver, SIM_Speed or SIM_Analog
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-COM-002, SYS-SEL-002, SYS-SEL-004, SYS-SEN-006, SYS-FLT-002, SYS-FLT-003, SYS-FLT-004, SYS-FLT-005,
+SYS-FLT-008, SYS-FLT-001, SYS-HMI-001, SIM-CON-003, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+RX timeout 30 ms = 3 x cycle time 10 ms; substitute values of can_matrix section 6.
+end note
+
+note over TCU: control active, mode Normal
+User -> Console : stop one message (SIM-CON-003)
+Console -> Plant : stop transmission of the message
+
+alt SIM_Driver (0x100) stops
+  Plant ->x TCU : SIM_Driver (last frame at t0)
+  ... 30 ms without SIM_Driver ...
+  TCU -> TCU : t0 + 30 ms: communication fault SIM_Driver (FaultBits 7, DTC U1100-87);\nsubstitutes Selector = invalid, Brake = released, Throttle = 0 % (SYS-COM-002)
+  TCU -> TCU : enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+  ... selector invalid for longer than 100 ms ...
+  TCU -> TCU : selector treated as N, selector fault (FaultBits 0) (SYS-SEL-002, SC-SEL-02)
+else SIM_Speed (0x101) stops
+  Plant ->x TCU : SIM_Speed (last frame at t0)
+  ... 30 ms without SIM_Speed ...
+  TCU -> TCU : t0 + 30 ms: communication fault SIM_Speed (FaultBits 8, DTC U1101-87);\nboth shaft speeds invalid; the shaft speed invalid fault (bit 6) is not set
+  TCU -> TCU : vehicle speed invalid -> RLS = OFF (SYS-SEL-004);\nenter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+else SIM_Analog (0x102) stops
+  Plant ->x TCU : SIM_Analog (last frame at t0)
+  ... 30 ms without SIM_Analog ...
+  TCU -> TCU : t0 + 30 ms: communication fault SIM_Analog (FaultBits 9, DTC U1102-87);\noil temperature substitute 80 degC (SYS-FLT-005); line pressure not available,\npressure plausibility suspended (SYS-SEN-006); sensor faults (bits 4, 5) not set
+  TCU -> TCU : enter limp-home, latched (SYS-FLT-002, SYS-FLT-004)
+end
+
+TCU -> Plant : TCU_Actuators: SS_A = OFF, SS_B = OFF, PCS_Duty = 0 %, FaultLamp = ON (SYS-FLT-001)
+note right of TCU: <= 100 ms after the communication fault is set (SYS-FLT-003)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 1 (Limp-home), FaultBits bit 7, 8 or 9 = 1;\nSIM_Driver: SelectorState = 7; SIM_Analog: OilTemp = 0xFF (can_matrix section 3.5)
+note over Plant, TCU: Safe state of SG-04: limp-home.
+
+User -> Console : restart the message
+Plant -> TCU : message received again
+TCU -> TCU : received values replace the substitute values;\nthe communication fault stays set until the next power cycle (SYS-FLT-008),\nlimp-home stays latched (SYS-FLT-004)
+note right of TCU: a selector fault from the SIM_Driver substitute clears\nafter 500 ms of valid positions (SYS-SEL-002)
+
+note over Plant, TCU: Timeouts are monitored from the application start; before the first reception the substitute values apply (SYS-COM-002 note, SC-STA-01).
+@enduml

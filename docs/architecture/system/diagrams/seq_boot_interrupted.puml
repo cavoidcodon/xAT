@@ -1,0 +1,69 @@
+@startuml seq_boot_interrupted
+title SC-BOOT-05 - Programming interrupted, then recovered
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+box "TCU"
+participant "Application" as App
+participant "PBL" as PBL
+participant "SBL" as SBL
+end box
+
+note over Tester, SBL
+Covers: SYS-BOOT-007, SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SYS-BOOT-009, SYS-BOOT-013, SYS-BOOT-015, SYS-DIA-005,
+SIM-TST-002, SIM-PLT-004, SG-06
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over Tester, SBL
+Programming as in SC-BOOT-01 is running in the PBL or SBL programming session (steps 5 .. 19).
+Steps 1 .. 4 run in the application: a stopped tester only ends the session (SYS-DIA-003, SC-DIA-01).
+end note
+
+alt reset or power loss
+  note over PBL, SBL: the MCU resets during the sequence
+else tester stops
+  ... no request for S3 = 5000 ms in the programming session ...
+  PBL -> PBL : the bootloader resets the MCU (SYS-BOOT-009)
+end
+note over PBL, SBL: reset: the SBL in RAM and the unlocked security state are discarded (SYS-BOOT-009)
+
+alt interrupted in steps 5 .. 12 (before eraseMemory): application area unchanged
+  PBL -> PBL : application check valid (SYS-BOOT-001), 50 ms boot window
+  PBL -> App : start the previous application (SC-STA-01)
+  note right of App: the unchanged previous application starts (SYS-BOOT-007)
+  Tester -> App : 22 F1 81
+  App --> Tester : 62 F1 81 <sw_version>
+  Tester -> App : new sequence from step 1 (SC-BOOT-01)
+else interrupted in step 19 (after 71 01 FF 01 00, before 51 01)
+  PBL -> PBL : application check valid: header sector programmed after 0202 / FF01\npassed (SYS-BOOT-015, SYS-BOOT-001), 50 ms boot window
+  PBL -> App : start the new, accepted application (SYS-BOOT-007)
+else interrupted in steps 13 .. 18 (erase, download, checks before the positive response to 31 01 FF 01)
+  note over PBL: the application header sector stays erased until 0202 and FF01\nof the application have passed (SYS-BOOT-015, reprogramming section 11)
+  PBL -> PBL : application header sector erased, rest of the area erased or partially written:\nthe check completes without a processor fault (SYS-BOOT-013) -> invalid
+  PBL -> PBL : stay in the bootloader, default session, no time limit (SYS-BOOT-002)
+  note over PBL: no TCU_Actuators / TCU_Status (SYS-BOOT-008)
+  Plant -> Plant : hydraulic default (SIM-PLT-004)
+  note over Tester, SBL: Safe state of SG-06: bootloader, plant in the hydraulic default.
+
+  == recovery: entry with an invalid application (reprogramming section 2) ==
+  Tester -> PBL : 22 F1 81
+  PBL --> Tester : 62 F1 81 FF FF FF FF
+  note right of PBL: application invalid (SYS-DIA-005)
+  Tester -> PBL : 10 02 (sent once)
+  PBL --> Tester : 50 02 00 32 01 F4
+  note right of PBL: PBL default -> programming session,\nno reset (reprogramming section 3)
+  Tester -> PBL : steps 6 .. 11: 27 11 / 27 12, 34, 36 ..., 37, 31 01 02 02, 31 01 03 01
+  SBL --> Tester : 71 01 03 01 00
+  Tester -> SBL : steps 12 .. 18: 2E F1 5A, 31 01 FF 00, 34, 36 ..., 37, 31 01 02 02, 31 01 FF 01
+  SBL --> Tester : 71 01 FF 01 00
+  Tester -> SBL : step 19: 11 01
+  SBL --> Tester : 51 01
+  PBL -> PBL : application check valid (SYS-BOOT-001), 50 ms boot window
+  PBL -> App : start the new application
+  note right of App: a full new programming sequence succeeds (SYS-BOOT-007)
+end
+
+note over Tester, SBL: A power loss while the SBL writes boot info keeps the previous record (two slots A / B, reprogramming section 7).
+@enduml

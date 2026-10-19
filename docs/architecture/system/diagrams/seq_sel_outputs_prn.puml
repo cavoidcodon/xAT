@@ -1,0 +1,48 @@
+@startuml seq_sel_outputs_prn
+title SC-SEL-05 - Solenoid outputs in P, R and N (prepared gear)
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SEL-005, SYS-SFT-005, SYS-SFT-006, SYS-ACT-001, SIM-PLT-002, SG-02, SG-03
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Solenoid table: 1st ON/ON, 2nd OFF/ON, 3rd OFF/OFF, 4th ON/OFF (SS_A/SS_B, system_context section 4).
+end note
+
+note over TCU
+In P, R and N the TCU commands the pattern of the gear it would command in D (SYS-SEL-005).
+The pattern follows this gear directly: SYS-SFT-003, SYS-SFT-004 and SYS-SFT-007 do not apply;
+SYS-SFT-005 applies. No shift is in progress (ShiftInProgress = 0).
+end note
+
+alt vehicle at standstill (< 2 km/h), selector P, R or N
+  Plant -> TCU : SIM_Driver: Selector = 0 / 1 / 2; vehicle speed < 2 km/h
+  TCU -> Plant : TCU_Actuators: SS_A = ON, SS_B = ON (1st prepared)
+  Plant -> Plant : P, N: no gear engaged; R: reverse only while RLS = ON (SIM-PLT-002)
+else rolling in N above standstill
+  Plant -> TCU : SIM_Driver: Selector = 2 (N), Throttle; SIM_Speed: OutputShaftSpeed
+  TCU -> TCU : gear from the shift schedule (vehicle speed, throttle),\nonly a gear with OutputShaftSpeed x ratio <= 6000 rpm (SYS-SFT-005)
+  note right of TCU: example from SYS-SFT-005: at 100 km/h\n1st would give about 8460 rpm,\nso no gear below 2nd is prepared;\nthe lowest higher gear within the limit (SYS-SFT-006)
+  TCU -> Plant : TCU_Actuators: SS_A / SS_B of the prepared gear (SYS-ACT-001)
+  TCU -> Plant : TCU_Status: SelectorState = 2 (N), ShiftInProgress = 0
+  Plant -> Plant : N: no gear engaged (SIM-PLT-002)
+  ... vehicle coasts, speed falls ...
+  TCU -> Plant : TCU_Actuators: pattern follows the schedule gear directly,\nalso by more than one step; no shift monitoring, no shift fault
+end
+
+== driver selects D ==
+User -> Console : select D
+Console -> Plant : selector D
+Plant -> Plant : lever in D: engages the prepared gear at once (SIM-PLT-002),\nbefore the TCU has accepted D
+Plant -> TCU : SIM_Driver: Selector = 3 (D)
+... 50 ms (SYS-SEL-001) ...
+TCU -> TCU : D accepted: takes over the prepared gear without a shift\n(SYS-SEL-005 note, SYS-SFT-006)
+
+note over Plant, TCU
+Safe state of SG-03: in P and N the plant engages no gear. SG-02: the gear prepared while rolling
+never exceeds 6000 rpm, so engaging it in D cannot overspeed the input shaft.
+end note
+@enduml

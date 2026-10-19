@@ -1,0 +1,35 @@
+@startuml seq_sft_engage_standstill
+title SC-SFT-01 - Drive engagement N / P -> D at standstill
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-SFT-006, SYS-ACT-001, SYS-SEL-001, SYS-SEL-005, SIM-PLT-002, SIM-CON-002
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: mode Normal, vehicle at standstill (< 2 km/h);\nin P / N the TCU prepares 1st: SS_A = ON, SS_B = ON (SYS-SEL-005)
+
+alt starting from P
+  User -> Console : press the brake, select D
+  note right of Console: leaving P needs SLS = ON (brake pressed,\nstandstill), see SC-SEL-03
+else starting from N
+  User -> Console : select D
+end
+Console -> Plant : selector D
+Plant -> Plant : lever in D: engages 1st from SS_A = ON, SS_B = ON (SIM-PLT-002)
+Plant -> TCU : SIM_Driver: Selector = 3 (D)
+... 50 ms unchanged (SYS-SEL-001) ...
+TCU -> TCU : D selected at standstill -> command 1st gear (SYS-SFT-006)
+TCU -> Plant : TCU_Actuators: SS_A = ON, SS_B = ON (1st, SYS-ACT-001), PCS_Duty from the table
+note right of TCU: pattern unchanged, no shift
+TCU -> Plant : TCU_Status: SelectorState = 3 (D), GearTarget = 1, Mode = 0 (Normal)
+
+User -> Console : release the brake, throttle
+Console -> Plant : Brake = released, Throttle
+Plant -> Plant : vehicle accelerates in 1st (SIM-PLT-006)
+note over Plant, TCU: upshifts continue in SC-SFT-03
+@enduml

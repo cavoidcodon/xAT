@@ -4,7 +4,7 @@
 |----------|-------|
 | Scope    | CAN bus between the TCU and the plant model (via the gateway) |
 | Parent   | `system_requirements.md` (`SYS-COM`, `SYS-DIA`) |
-| Version  | 1.0   |
+| Version  | 1.3   |
 | Status   | Approved |
 
 This document is the **single source** for CAN identifiers, layouts and scaling
@@ -93,32 +93,38 @@ Speeds are unsigned: in reverse the plant sends the magnitude.
 | GearActual | 3 | 4 | 0 = none / N, 1 .. 4, 5 = R | - | engaged gear as seen by the TCU; 15 = unknown |
 | GearTarget | 7 | 4 | same as GearActual | - | commanded gear |
 | Mode | 9 | 2 | 0 = Normal, 1 = Limp-home | - | - |
-| SelectorState | 12 | 3 | same as `SIM_Driver.Selector` | - | debounced position; 7 = invalid |
+| SelectorState | 12 | 3 | same as `SIM_Driver.Selector` | - | debounced position; 7 = invalid, sent while the selector fault (`SYS-SEL-002`) is set |
 | ShiftInProgress | 13 | 1 | 0 / 1 | - | - |
 | VehicleSpeed | 23 | 16 | 0.1 km/h/bit | 0 .. 2500 | 0xFFFF = invalid |
 | FaultBits | 39 | 16 | bit field, section 3.6 | - | - |
-| OilTemp | 55 | 8 | 1 degC/bit, offset -40 | 0 .. 190 (-40 .. 150 degC) | 0xFF = invalid |
+| OilTemp | 55 | 8 | 1 degC/bit, offset -40 | 0 .. 190 (-40 .. 150 degC) | 0xFF = invalid, sent while the substitute oil temperature (`SYS-FLT-005`, section 6) is used |
 | AliveCtr | 59 | 4 | - | 0 .. 15 | - |
 
 ### 3.6 `TCU_Status.FaultBits`
 
 Bit numbers refer to the signal value (bit 0 = least significant bit, located in byte 5).
 
-| Bit | Fault | Requirement |
-|---|---|---|
-| 0 | selector fault | SYS-SEL-002 |
-| 1 | shift fault | SYS-SFT-007 |
-| 2 | ratio fault | SYS-SEN-005 |
-| 3 | pressure fault | SYS-SEN-006 |
-| 4 | line pressure sensor fault | SYS-SEN-004 |
-| 5 | oil temperature sensor fault | SYS-SEN-004 |
-| 6 | shaft speed invalid | SYS-SEN-002 |
-| 7 | communication fault `SIM_Driver` | SYS-COM-002 |
-| 8 | communication fault `SIM_Speed` | SYS-COM-002 |
-| 9 | communication fault `SIM_Analog` | SYS-COM-002 |
-| 10 | bus-off | SYS-COM-006 |
-| 11 | oil overtemperature | SYS-FLT-006 |
-| 12 .. 15 | reserved (0) | - |
+DTCs (`SYS-FLT-007`) use DTCFormatIdentifier 0x00 (ISO 15031-6 / SAE J2012: two-byte DTC
+plus failure type byte). Generic SAE codes are used where one matches; `U11xx` are
+project-specific codes named after the CAN ID of the lost message. Failure type bytes:
+`1C` voltage out of range, `29` signal invalid, `64` signal plausibility failure,
+`87` missing message, `88` bus off, `00` no sub-type. P0715 stands for both shaft speeds.
+
+| Bit | Fault | Requirement | DTC | Bytes |
+|---|---|---|---|---|
+| 0 | selector fault | SYS-SEL-002 | P0705-29 | 07 05 29 |
+| 1 | shift fault | SYS-SFT-007 | P0780-00 | 07 80 00 |
+| 2 | ratio fault | SYS-SEN-005 | P0730-00 | 07 30 00 |
+| 3 | pressure fault | SYS-SEN-006 | P0840-64 | 08 40 64 |
+| 4 | line pressure sensor fault | SYS-SEN-004 | P0840-1C | 08 40 1C |
+| 5 | oil temperature sensor fault | SYS-SEN-004 | P0710-1C | 07 10 1C |
+| 6 | shaft speed invalid | SYS-SEN-002 | P0715-29 | 07 15 29 |
+| 7 | communication fault `SIM_Driver` | SYS-COM-002 | U1100-87 | D1 00 87 |
+| 8 | communication fault `SIM_Speed` | SYS-COM-002 | U1101-87 | D1 01 87 |
+| 9 | communication fault `SIM_Analog` | SYS-COM-002 | U1102-87 | D1 02 87 |
+| 10 | bus-off | SYS-COM-006 | U0001-88 | C0 01 88 |
+| 11 | oil overtemperature | SYS-FLT-006 | P0218-00 | 02 18 00 |
+| 12 .. 15 | reserved (0) | - | - | - |
 
 ## 4. Sensor characteristics
 
@@ -136,7 +142,7 @@ range limit the value is clamped.
 | Parameter | Value |
 |---|---|
 | Physical request | 0x7E1 |
-| Functional request | 0x7DF (single frame only) |
+| Functional request | 0x7DF (single frame only); used by the tester only for `3E 80`, every other request is physical (0x7E1) |
 | Response | 0x7E9 |
 | ISO-TP addressing | normal, DLC always 8 |
 | Padding byte | 0xCC |
@@ -150,6 +156,17 @@ The same identifiers and parameters are used by the application, the PBL and the
 
 | Message | On timeout (`SYS-COM-002`) |
 |---|---|
-| `SIM_Driver` | Selector = invalid (-> `SYS-SEL-002`), Brake = released, Throttle = 0 %; communication fault -> limp-home |
-| `SIM_Speed` | both speeds invalid; communication fault -> limp-home |
-| `SIM_Analog` | oil temperature substitute value (`SYS-FLT-005`); line pressure not available, pressure plausibility suspended; communication fault, no limp-home |
+| `SIM_Driver` | Selector = invalid (-> `SYS-SEL-002`), Brake = released, Throttle = 0 %; communication fault (bit 7) -> limp-home |
+| `SIM_Speed` | both speeds invalid; communication fault (bit 8) -> limp-home; the shaft speed invalid fault (bit 6) is not set |
+| `SIM_Analog` | oil temperature substitute value 80 degC (`SYS-FLT-005`); line pressure not available, pressure plausibility suspended; communication fault (bit 9) -> limp-home (fault lamp ON); the sensor faults (bits 4, 5) are not set |
+
+The substitute values also apply from the start of the application until the first reception
+of the message (`SYS-COM-002`).
+
+Changed on 2026-10-17 (user, system design findings F-12, F-14, F-16): fault bits per
+timeout named; a `SIM_Analog` timeout now enters limp-home like a line pressure sensor fault
+(`SYS-FLT-002`); functional addressing only for `3E 80`.
+
+Changed on 2026-10-17 (user, system design findings N-02, N-03): `TCU_Status.SelectorState`
+is 7 while the selector fault is set; `TCU_Status.OilTemp` is 0xFF while the substitute oil
+temperature is used.

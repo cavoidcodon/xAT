@@ -1,0 +1,61 @@
+@startuml seq_boot_check_failed
+title SC-BOOT-03 - checkMemory or checkProgrammingDependencies failed
+
+participant "UDS tester" as Tester
+participant "Plant model" as Plant
+box "TCU"
+participant "PBL" as PBL
+participant "SBL" as SBL
+end box
+
+note over Tester, SBL
+Covers: SYS-BOOT-001, SYS-BOOT-002, SYS-BOOT-008, SYS-BOOT-013, SYS-BOOT-015, SIM-TST-001, SIM-TST-002, SIM-PLT-004, SG-06
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+alt SBL image: CRC mismatch at checkMemory in the PBL (step 10)
+  Tester -> PBL : 31 01 02 02 <crc32>
+  PBL --> Tester : 71 01 02 02 01
+  note right: 1 = CRC mismatch (reprogramming section 11)
+  Tester -> PBL : 31 01 03 01
+  PBL --> Tester : 7F 31 24
+  note right: requestSequenceError: the last 0202 did not return 0\n(reprogramming section 11.1); the SBL is not started
+  opt 0202 returned 0 but the SBL header is invalid (magic 0x53544178, header_crc32)
+    Tester -> PBL : 31 01 03 01
+    PBL --> Tester : 7F 31 22
+    note right: conditionsNotCorrect (reprogramming section 11.1)
+  end
+  Tester -> Tester : stop with a clear message (SIM-TST-001)
+  note over PBL: the application in flash is unchanged: after the next reset the PBL\nstarts it if it is valid (SYS-BOOT-001), otherwise stays in the default session
+else application image: CRC mismatch at checkMemory in the SBL (step 17)
+  Tester -> SBL : 31 01 02 02 <crc32>
+  SBL -> SBL : CRC mismatch -> the flash sector that holds the application header\n(0x0001_4000 .. 0x0001_5FFF) is not programmed, it stays erased (SYS-BOOT-015)
+  SBL --> Tester : 71 01 02 02 01
+  Tester -> SBL : 31 01 FF 01
+  SBL --> Tester : 7F 31 24
+  note right: requestSequenceError: the last 0202 of the\napplication did not return 0 (reprogramming section 11.1)
+  Tester -> Tester : stop with a clear message (SIM-TST-001)
+else checkProgrammingDependencies fails (step 18)
+  Tester -> SBL : 31 01 FF 01
+  SBL -> SBL : header invalid / hw_id not 0x0947_0001 / min_pbl_version > PBL version\n-> the application header sector is not programmed, it stays erased (SYS-BOOT-015)
+  SBL --> Tester : 71 01 FF 01 01 | 02 | 03
+  note right: 1 header invalid, 2 hw_id mismatch,\n3 PBL version too old (reprogramming section 11)
+  Tester -> Tester : stop with a clear message (SIM-TST-001)
+end
+
+== after the application branches: next reset (11 01, S3 timeout or power cycle) ==
+Tester -> SBL : 11 01
+SBL --> Tester : 51 01
+note over PBL, SBL: reset: the SBL in RAM is discarded
+PBL -> PBL : application check fails (header sector still erased), without a processor fault\n(SYS-BOOT-001, SYS-BOOT-013)
+PBL -> PBL : stay in the bootloader, default session, no time limit (SYS-BOOT-002)
+note over PBL: no TCU_Actuators / TCU_Status (SYS-BOOT-008)
+Plant -> Plant : no TCU_Actuators for 50 ms: hydraulic default (SIM-PLT-004)
+Tester -> PBL : 22 F1 81
+PBL --> Tester : 62 F1 81 FF FF FF FF
+note over Tester, SBL
+Safe state of SG-06: the rejected image is never started; the TCU stays in the bootloader with the plant in the hydraulic default.
+Recovery: a full new programming sequence from the PBL default session (SC-BOOT-05).
+end note
+@enduml

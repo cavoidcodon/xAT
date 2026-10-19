@@ -1,0 +1,35 @@
+@startuml seq_flt_oil_overtemp
+title SC-FLT-07 - Oil overtemperature: fault lamp only
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-FLT-006, SYS-FLT-008, SYS-HMI-001, SYS-SEN-003, SIM-PLT-007, SIM-CON-003
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+end note
+
+note over TCU: control active, mode Normal, no other fault
+alt oil heats up while driving
+  Plant -> Plant : warm-up while driving (SIM-PLT-007)
+else console forces the sensor voltage
+  User -> Console : force OilTempVoltage (SIM-CON-003)
+  Console -> Plant : sensor voltage forced
+end
+Plant -> TCU : SIM_Analog: OilTempVoltage of more than 130 degC
+TCU -> TCU : oil temperature > 130 degC (SYS-SEN-003): oil overtemperature fault\n(FaultBits 11, DTC P0218-00) (SYS-FLT-006)
+TCU -> Plant : TCU_Actuators: FaultLamp = ON; gear and PCS_Duty unchanged
+note right of TCU: warning only: no limit of gear or line pressure,\nmode stays Normal (SYS-FLT-006 note)
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 0 (Normal), FaultBits bit 11 = 1
+
+... oil cools down ...
+Plant -> TCU : SIM_Analog: oil temperature at or below 130 degC
+TCU -> TCU : oil overtemperature fault cleared (SYS-FLT-008)
+TCU -> Plant : TCU_Actuators: FaultLamp = OFF (no other fault requires it, SYS-HMI-001)
+TCU -> LED : OFF
+TCU -> Plant : TCU_Status: FaultBits bit 11 = 0
+@enduml

@@ -1,0 +1,64 @@
+@startuml seq_flt_dtc_memory
+title SC-FLT-08 - Fault memory: read and clear DTCs
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "UDS tester" as Tester
+participant "TCU" as TCU
+
+note over User, TCU
+Covers: SYS-FLT-007, SYS-DIA-002, SYS-DIA-003, SYS-FLT-004, SYS-FLT-008, SIM-TST-003, SIM-CON-003
+UDS requests on DIAG_PhysReq 0x7E1, responses on DIAG_Resp 0x7E9 (can_matrix section 5).
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+DTC status bits: testFailed (bit 0, fault currently set), confirmedDTC (bit 3, set since the last clear);
+availability mask 0x09; DTCFormatIdentifier 0x00 (can_matrix section 3.6).
+end note
+
+== fault sets its DTC ==
+User -> Console : force LinePressVoltage = 0 mV (SIM-CON-003)
+Console -> Plant : sensor voltage forced
+Plant -> TCU : SIM_Analog: LinePressVoltage = 0 mV
+... longer than 100 ms ...
+TCU -> TCU : line pressure sensor fault (FaultBits 4) -> limp-home (SC-FLT-04);\nDTC P0840-1C (08 40 1C): status 0x09 (SYS-FLT-007)
+
+== read (default session, no security access) ==
+Tester -> TCU : 19 01 09
+TCU --> Tester : 59 01 09 00 00 01
+note right: availability mask 09, format 00, one DTC
+Tester -> TCU : 19 02 09
+TCU --> Tester : 59 02 09 08 40 1C 09
+Tester -> Tester : show P0840-1C line pressure sensor fault (SIM-TST-003)
+
+== clear while the fault is still present ==
+Tester -> TCU : 14 FF FF FF
+TCU --> Tester : 54
+TCU -> TCU : DTCs cleared; mode, fault bits and outputs unchanged,\nlimp-home stays (SYS-FLT-007, SYS-FLT-004)
+TCU -> TCU : the fault is still present: DTC P0840-1C set again, status 0x09
+Tester -> TCU : 19 02 09
+TCU --> Tester : 59 02 09 08 40 1C 09
+
+opt DTC setting off (85 02)
+  Tester -> TCU : 10 03
+  TCU --> Tester : 50 03 00 32 01 F4
+  note right: P2 = 50 ms, P2* = 5000 ms (10 ms units)
+  Tester -> TCU : 85 02
+  TCU --> Tester : C5 02
+  User -> Console : force OilTempVoltage = 0 mV
+  Plant -> TCU : SIM_Analog: OilTempVoltage = 0 mV
+  ... longer than 100 ms ...
+  TCU -> TCU : oil temperature sensor fault (FaultBits 5 = 1);\nDTC status bits not updated while DTC setting is off (SYS-FLT-007)
+  Tester -> TCU : 19 02 09
+  TCU --> Tester : 59 02 09 08 40 1C 09
+  note right: P0710-1C not reported
+  ... no request for S3 = 5000 ms ...
+  TCU -> TCU : default session, effect of 85 undone (SYS-DIA-003):\nDTC P0710-1C set, status 0x09
+end
+
+== power cycle ==
+User -> Console : remove all injections
+TCU -> TCU : reset: volatile DTC memory cleared (SYS-FLT-007),\nlimp-home and fault bits cleared (SYS-FLT-004, SYS-FLT-008)
+Tester -> TCU : 19 02 09
+TCU --> Tester : 59 02 09
+note right: no DTC stored
+@enduml

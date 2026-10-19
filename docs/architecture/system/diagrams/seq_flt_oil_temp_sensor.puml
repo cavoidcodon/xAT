@@ -1,0 +1,39 @@
+@startuml seq_flt_oil_temp_sensor
+title SC-FLT-03 - Oil temperature sensor out of range: substitute 80 degC, mode Normal
+
+actor "Console user" as User
+participant "Console" as Console
+participant "Plant model" as Plant
+participant "TCU" as TCU
+participant "Red LED\n(TCU board)" as LED
+
+note over User, LED
+Covers: SYS-SEN-003, SYS-SEN-004, SYS-FLT-005, SYS-FLT-008, SYS-HMI-001, SIM-CON-003, SG-04
+CAN frames pass can0 / slcand / gateway transparently (DC-05, SIM-GW-001), see SC-STA-04.
+Valid electrical range 200 .. 4800 mV (can_matrix section 4).
+end note
+
+note over TCU: control active, mode Normal, no other fault
+User -> Console : force OilTempVoltage (open circuit 0 mV or short circuit 5000 mV) (SIM-CON-003)
+Console -> Plant : sensor voltage forced
+Plant -> TCU : SIM_Analog: OilTempVoltage = 0 mV (t0)
+loop every 10 ms
+  Plant -> TCU : SIM_Analog: OilTempVoltage outside 200 .. 4800 mV
+end
+... outside 200 .. 4800 mV for longer than 100 ms ...
+TCU -> TCU : t0 + 100 ms: oil temperature sensor fault (FaultBits 5, DTC P0710-1C) (SYS-SEN-004)
+TCU -> TCU : substitute oil temperature 80 degC, stay in mode Normal (SYS-FLT-005)
+TCU -> Plant : TCU_Actuators: FaultLamp = ON, shift control continues
+TCU -> LED : ON (SYS-HMI-001)
+TCU -> Plant : TCU_Status: Mode = 0 (Normal), OilTemp = 0xFF (substitute used,\ncan_matrix section 3.5), FaultBits bit 5 = 1
+
+User -> Console : remove the injection
+Plant -> TCU : SIM_Analog: OilTempVoltage within 200 .. 4800 mV (t1)
+... within 200 .. 4800 mV for 100 ms ...
+TCU -> TCU : t1 + 100 ms: oil temperature sensor fault cleared,\nmeasured oil temperature used again (SYS-FLT-008, SYS-SEN-003)
+TCU -> Plant : TCU_Actuators: FaultLamp = OFF (no other fault requires it, SYS-HMI-001)
+TCU -> LED : OFF
+TCU -> Plant : TCU_Status: OilTemp = measured value, FaultBits bit 5 = 0
+
+note over Plant, TCU: In limp-home the lamp stays ON after the recovery (SYS-FLT-001, SYS-HMI-001).
+@enduml
