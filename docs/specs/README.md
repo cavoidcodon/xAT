@@ -142,5 +142,6 @@ table states which case applies and what clears it.
 2. A task file lists the requirement IDs it implements (section "Requirements", column
    "Parent").
 3. Code and tests reference requirement IDs in comments, e.g. `/* [SYS-SFT-003] */`,
-   the same way SWS IDs are referenced.
+   the same way SWS IDs are referenced (format and placement: `.claude/rules/coding_rules.md`
+   8.6).
 4. The `verify` step checks that the diff matches the approved requirements.

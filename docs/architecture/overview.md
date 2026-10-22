@@ -48,7 +48,7 @@ Task and status: `.claude/tasks/backlog.md`.
 
 | Module | Layer | Design notes |
 |---|---|---|
-| Std_Types / Platform_Types / Compiler | platform | — |
+| Std_Types / Platform_Types / Compiler | platform | [Platform](../modules/Platform/design.md) |
 | Det | bsw/services | — |
 | Mcu | mcal | — |
 | Port | mcal | — |

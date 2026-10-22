@@ -29,9 +29,17 @@ Input: module abbreviation `<Ma>` (exact BSW module list spelling, e.g. `Dio`, `
    | `Module_Cfg.h` | `src/<layer>/<Ma>/config/<Ma>_Cfg.h` |
    | `Module_Cfg.c` | `src/<layer>/<Ma>/config/<Ma>_Cfg.c` |
    | `test_Module.c` | `tests/unit/<layer>/<Ma>/test_<Ma>.c` |
+   | `CMakeLists_test.txt` | `tests/unit/<layer>/<Ma>/CMakeLists.txt` |
 
    Placeholders: `<Ma>` (e.g. `Dio`), `<MA>` (e.g. `DIO`), `<MODULE_ID>`, `<SWS_DOC>`
-   (e.g. `AUTOSAR_SWS_DIODriver`), `<LAYER>`.
+   (e.g. `AUTOSAR_SWS_DIODriver`), `<LAYER>` (the layer path, e.g. `mcal`, `bsw/ecual`).
+   Adjust `MOCKS` to the module's real dependencies (for MCAL, the fake SDK headers in
+   `tests/unit/stubs/sdk/`).
+
+   Register the module in both builds (`docs/unit_testing.md`, `docs/operations.md`):
+   - firmware: one line in `src/ecu/CMakeLists.txt`,
+     `xat_add_module(NAME <Ma> DIR ${XAT_ROOT}/src/<layer>/<Ma>)`;
+   - host tests: `add_subdirectory(<layer>/<Ma>)` in `tests/unit/CMakeLists.txt`.
 4. Fill in only the skeleton: the published information, the DET error codes and service
    IDs from the SWS, and the API prototypes with `/* TODO */` bodies. **Do not implement
    behaviour.** Implementation is a separate task that the user approves.

@@ -1,0 +1,129 @@
+# =========================================================================
+#   CMock - Automatic Mock Generation for C
+#   ThrowTheSwitch.org
+#   Copyright (c) 2007-26 Mike Karlesky, Mark VanderVoord, & Greg Williams
+#   SPDX-License-Identifier: MIT
+# =========================================================================
+
+---
+:cmock:
+  :plugins: [ignore, expect_any_args, array]
+  :treat_as:
+    custom_type: INT
+
+:systest:
+  :types: |
+    #define BIG_FAT_STRUCT_SIZE   (512)
+    typedef struct _BIG_FAT_STRUCT_T
+    {
+      char bytes[BIG_FAT_STRUCT_SIZE];
+    } BIG_FAT_STRUCT_T;
+
+  :mockable: |
+    void foo(BIG_FAT_STRUCT_T a);
+    int get_result(void);
+    void process_data(int* data, int count);
+
+  :source:
+    :header: |
+      void   function_a(void);
+      void   function_b(void);
+
+    :code: |
+      void function_a(void)
+      {
+        BIG_FAT_STRUCT_T stuff = { { 8, 0 } };
+        foo(stuff);
+      }
+
+      void function_b(void)
+      {
+        BIG_FAT_STRUCT_T stuff1 = { { 9, 1, 0 } };
+        BIG_FAT_STRUCT_T stuff2 = { { 9, 2, 0 } };
+        foo(stuff1);
+        foo(stuff2);
+      }
+
+  :tests:
+    :common: |
+      void setUp(void) {}
+      void tearDown(void) {}
+
+    :units:
+    - :pass: TRUE
+      :should: 'successfully should be able to run function a because it only takes half the memory'
+      :code: |
+        test()
+        {
+          int i=0;
+          BIG_FAT_STRUCT_T expected = { { 8, 0 } };
+          // Fill expectations until there is not enough room for more.
+          // We know we can ask one more when there is only enough room for 2 blocks, ignoring overhead.
+          while (CMock_Guts_MemBytesFree() > (CMOCK_MEM_SIZE*2)) {
+            i++;
+            foo_Expect(expected);
+          }
+          for (; i>0; i--) {
+            function_a();
+          }
+        }
+
+    - :pass: FALSE
+      :should: 'should error out because we do not have eough memory to handle two of these structures'
+      :verify_error: 'CMock has run out of memory. Please allocate more.'
+      :code: |
+        test()
+        {
+          int i=0;
+          BIG_FAT_STRUCT_T expected1 = { { 9, 1, 0 } };
+          BIG_FAT_STRUCT_T expected2 = { { 9, 2, 0 } };
+          // Ask for more room than we have
+          while (CMock_Guts_MemBytesFree() > 0) {
+            foo_Expect(expected1);
+            foo_Expect(expected2);
+          }
+
+          // It should not actually get here
+          for (i=0; i < (CMOCK_MEM_SIZE/BIG_FAT_STRUCT_SIZE - 1); i++) {
+            function_b();
+          }
+        }
+
+    - :pass: FALSE
+      :should: 'should error out on ExpectAnyArgs when memory is exhausted'
+      :verify_error: 'CMock has run out of memory. Please allocate more.'
+      :code: |
+        test()
+        {
+          // Fill all available memory with ExpectAnyArgs call instances
+          while (CMock_Guts_MemBytesFree() > 0) {
+            foo_ExpectAnyArgs();
+          }
+        }
+
+    - :pass: FALSE
+      :should: 'should error out on IgnoreAndReturn when memory is exhausted'
+      :verify_error: 'CMock has run out of memory. Please allocate more.'
+      :code: |
+        test()
+        {
+          // Fill all available memory with IgnoreAndReturn call instances
+          while (CMock_Guts_MemBytesFree() > 0) {
+            get_result_IgnoreAndReturn(42);
+          }
+        }
+
+    - :pass: FALSE
+      :should: 'should error out on ExpectWithArray when memory is exhausted'
+      :verify_error: 'CMock has run out of memory. Please allocate more.'
+      :code: |
+        test()
+        {
+          int data = 0;
+          // Fill all available memory with ExpectWithArray call instances
+          while (CMock_Guts_MemBytesFree() > 0) {
+            process_data_ExpectWithArray(&data, 1, 1);
+          }
+        }
+
+...

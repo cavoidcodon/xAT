@@ -1,0 +1,40 @@
+@startuml platform_component
+title Platform headers - include structure (TASK-003)
+
+skinparam componentStyle rectangle
+skinparam defaultTextAlignment center
+
+package "C standard library" {
+  artifact "<stdint.h>" as stdint
+}
+
+package "src/platform/include" {
+  artifact "Std_Types.h\n(SWS_StandardTypes)" as std
+  artifact "Platform_Types.h\n(SWS_PlatformTypes)" as plat
+  artifact "Compiler.h\n(SWS_CompilerAbstraction)" as comp
+  artifact "Compiler_Cfg.h\n(empty, DEV-01)" as compcfg
+}
+
+package "Users" {
+  component "BSW / MCAL / OS modules\n(<Ma>.h includes Std_Types.h)" as modules
+  component "RTE / SWCs\n(through Rte_Type.h)" as rte
+  component "src/ecu (main.c)" as ecu
+  component "host unit tests\n(tests/unit)" as tests
+}
+
+std --> plat : includes
+std --> comp : includes
+comp --> compcfg : includes
+plat --> stdint : includes
+
+modules --> std
+rte --> std
+ecu --> std
+tests --> std
+
+note right of comp
+  _GCC_C_CORTEXM33_ (target, arm-none-eabi-gcc 15.2)
+  _GCC_C_AARCH64_ (host, gcc 13.3)
+  any other compiler / platform: #error
+end note
+@enduml

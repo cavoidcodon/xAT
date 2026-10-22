@@ -33,9 +33,11 @@ static const <Ma>_ConfigType *s_configPtr = NULL_PTR;
 /*==================================================================================================
  *                                     GLOBAL FUNCTIONS
  *================================================================================================*/
+/* [SWS_<Ma>_xxxxx] TODO: requirement IDs of this API (coding_rules.md 8.6) */
 void <Ma>_Init(const <Ma>_ConfigType *config_ptr)
 {
 #if (<MA>_DEV_ERROR_DETECT == STD_ON)
+    /* [SWS_<Ma>_xxxxx] TODO: requirement ID of this DET check */
     if (config_ptr == NULL_PTR)
     {
         (void)Det_ReportError(<MA>_MODULE_ID, <MA>_INSTANCE_ID, <MA>_SID_INIT, <MA>_E_PARAM_POINTER);
@@ -50,6 +52,7 @@ void <Ma>_Init(const <Ma>_ConfigType *config_ptr)
 }
 
 #if (<MA>_VERSION_INFO_API == STD_ON)
+/* [SWS_<Ma>_xxxxx] TODO: requirement IDs of this API (coding_rules.md 8.6) */
 void <Ma>_GetVersionInfo(Std_VersionInfoType *version_info)
 {
     /* TODO: DET check for NULL_PTR, fill vendorID/moduleID/sw_*_version */

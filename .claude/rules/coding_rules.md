@@ -31,10 +31,12 @@ When a rule here conflicts with a name or signature that an AUTOSAR SWS defines,
 
 ### 2.1 Names defined by AUTOSAR (keep them exactly as written)
 
-Any symbol that a SWS defines keeps its SWS spelling, even when that spelling breaks 2.2.
-This covers API functions, types, enum literals, macros, error codes, callbacks and
+Any symbol that a SWS defines keeps its SWS spelling, even when that spelling breaks 1.3 or
+2.2. This covers API functions, types, enum literals, macros, error codes, callbacks and
 callouts. Examples: `Dio_ReadChannel`, `Dio_ChannelType`, `DIO_E_PARAM_INVALID_CHANNEL_ID`,
-`Mcu_ConfigType`, `E_OK`, `STD_HIGH`, `NULL_PTR`.
+`Mcu_ConfigType`, `E_OK`, `STD_HIGH`, `NULL_PTR`, and the compiler symbol
+`_GCC_C_CORTEXM33_` of `Compiler.h` (leading underscore, SWS_COMPILER_00010; marked with a
+MISRA C:2012 Rule 21.1 deviation comment).
 
 ### 2.2 Names defined by the project
 
@@ -71,8 +73,10 @@ Rules:
 1. Use the AUTOSAR types from `Platform_Types.h` / `Std_Types.h`: `uint8`, `uint16`,
    `uint32`, `uint64`, `sint8` … `sint64`, `boolean`, `float32`, `float64`.
    Do not use the native `int`, `short`, `long`, `char` (except `char` for string
-   literals) or `<stdint.h>` types in module code. The only exception is MCAL code that
-   passes values to or from the NXP SDK.
+   literals) or `<stdint.h>` types in module code. The only exceptions are MCAL code that
+   passes values to or from the NXP SDK, and `Platform_Types.h`, which maps the AUTOSAR
+   types onto the `<stdint.h>` exact-width types (same widths on the ILP32 target and the
+   LP64 host, same underlying types as the SDK; TASK-003).
 2. Return `Std_ReturnType` (`E_OK` / `E_NOT_OK`) from functions that can fail, unless the
    SWS specifies another type.
 3. Use `TRUE` / `FALSE`, `STD_HIGH` / `STD_LOW`, `STD_ON` / `STD_OFF` and `NULL_PTR`.
@@ -170,10 +174,27 @@ Every `<Ma>.h` defines:
 1. Indent with 4 spaces, never tabs. Keep lines at 120 characters or fewer.
 2. Put braces on their own line (Allman style).
 3. Write comments with `/* */`. Comment *why*, not *what*.
-4. Document public APIs with Doxygen (`@brief`, `@param[in/out]`, `@return`) and the SWS
-   requirement IDs they implement, for example `/* [SWS_Dio_00133] */`. This is how the
-   compliance matrix in `docs/autosar_compliance.md` traces requirements to code.
+4. Document public APIs with Doxygen (`@brief`, `@param[in/out]`, `@return`) and the
+   requirement IDs they implement (8.6).
 5. Declare one variable per line, at the start of its block.
+6. **Requirement tags.** Every piece of code that implements a requirement has the IDs of
+   those requirements in a comment directly above it, so that coverage can be reviewed
+   with `grep`. This is how `docs/autosar_compliance.md` (SWS) and
+   `docs/specs/traceability.md` (SYS / SWR) trace requirements to code.
+   - Format: each ID in square brackets; one comment may list several IDs, followed by a
+     short text: `/* [SWS_Dio_00133] [REQ-007-03] channel ID out of range */`.
+   - IDs: AUTOSAR `SWS_<Ma>_nnnnn` (and `SWS_BSW_nnnnn`); specs `SG-nn`,
+     `SYS-<AREA>-nnn`, `SWR-<SWC>-nnn`, `SIM-<AREA>-nnn`; task requirements
+     `REQ-<task>-nn` (section 5 of the task file, e.g. `REQ-003-01`).
+   - Place the tag on the smallest unit that implements the requirement: a type, macro,
+     constant, function, or a block inside a function (for example one DET check), not
+     as one list at the top of the file.
+   - The same applies to CMake, configuration (`config/`) and linker files
+     (`# [REQ-003-10]`), and to tests (`testing_rules.md`).
+   - A requirement that is not implemented (usage rule, deviation, not applicable) may be
+     cited in an explaining comment; its status is in the compliance matrix.
+   - List every tag:
+     `grep -rnoE '\[(SWS_[A-Za-z]+_[0-9]{5}|SG-[0-9]{2}|(SYS|SWR|SIM)-[A-Z]+-[0-9]{3}|REQ-[0-9]{3}-[0-9]{2})\]' src tests cmake`.
 
 ## 9. Build and static checks
 
@@ -187,6 +208,6 @@ Every `<Ma>.h` defines:
 
 | ID | Deviation | Reason | Status |
 |---|---|---|---|
-| DEV-01 | No compiler abstraction pointer/function macros (`FUNC`, `P2VAR`, `P2CONST`, `VAR`, `CONST`). `Compiler.h` still provides `INLINE`, `LOCAL_INLINE` and `NULL_PTR`. | Cortex-M33 has a flat address space; the macros make the code harder to read with no benefit. | Accepted |
+| DEV-01 | No compiler abstraction pointer/function macros (`FUNC`, `FUNC_P2CONST`, `FUNC_P2VAR`, `P2VAR`, `P2CONST`, `CONSTP2VAR`, `CONSTP2CONST`, `P2FUNC`, `CONSTP2FUNC`, `VAR`, `CONST`); `Compiler_Cfg.h` has no memory / pointer classes. `Compiler.h` still provides `AUTOMATIC`, `TYPEDEF`, `INLINE`, `LOCAL_INLINE` and `NULL_PTR`. | Cortex-M33 has a flat address space; the macros make the code harder to read with no benefit. | Accepted |
 | DEV-02 | No `<Ma>_MemMap.h` sections at first. | Single core, default linker sections are enough. | Revisit when memory partitioning or a safety split is needed |
 | DEV-03 | Configuration is handwritten (no ECUC/ARXML generator). | Decided in CLAUDE.md. | Accepted |

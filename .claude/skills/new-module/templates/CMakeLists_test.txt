@@ -1,0 +1,16 @@
+# Unit tests of <Ma> (<SWS_DOC>), host build. See docs/unit_testing.md.
+#
+# Requirement tags: [SWS_<Ma>_xxxxx] = <SWS_DOC>.
+
+set(MA_DIR ${XAT_ROOT}/src/<LAYER>/<Ma>)
+
+# Only <Ma> is real; every dependency is a CMock mock of its header (testing_rules.md).
+xat_add_unit_test(NAME test_<Ma>
+    SOURCES ${MA_DIR}/src/<Ma>.c ${MA_DIR}/config/<Ma>_Cfg.c test_<Ma>.c
+    MOCKS ${XAT_ROOT}/src/bsw/services/Det/include/Det.h
+    INCLUDES ${MA_DIR}/include ${MA_DIR}/config)
+
+# Every public header compiles on its own and has its include guard (coding_rules.md 4.1, 4.2).
+xat_add_compile_check(NAME compile_check_<Ma>
+    HEADERS ${MA_DIR}/include/<Ma>.h ${MA_DIR}/config/<Ma>_Cfg.h
+    INCLUDES ${MA_DIR}/include ${MA_DIR}/config)

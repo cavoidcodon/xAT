@@ -10,7 +10,7 @@ MCAL tasks implement their AUTOSAR SWS.
 | Task | Title | Layer | Depends on | Status |
 |---|---|---|---|---|
 | TASK-001 | Build / flash / debug tooling (`scripts/operations.py`) | tooling | — | DONE |
-| TASK-003 | Platform types (`Std_Types`, `Platform_Types`, `Compiler`), firmware entry `src/ecu`, CMake module helper, Unity + CMock host test build | platform | TASK-001 | TODO |
+| TASK-003 | Platform types (`Std_Types`, `Platform_Types`, `Compiler`), firmware entry `src/ecu`, CMake module helper, Unity + CMock host test build | platform | TASK-001 | DONE |
 | TASK-004 | `Det` | bsw/services | TASK-003 | TODO |
 | TASK-005 | `Mcu` (clocks, reset reason) | mcal | TASK-004 | TODO |
 | TASK-006 | `Port` | mcal | TASK-005 | TODO |

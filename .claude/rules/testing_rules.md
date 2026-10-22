@@ -25,8 +25,13 @@ Rules:
   header in `tests/unit/stubs/sdk/`.
 - Name tests `test_<Api>_<Condition>_<ExpectedResult>`, for example
   `test_ReadChannel_NotInitialized_ReportsUninitDetError`.
-- Each SWS requirement covered gets its ID in a comment above the test:
-  `/* [SWS_Dio_00133] */`. Update the matrix in `docs/autosar_compliance.md`.
+- Each test has the IDs of all requirements it covers (SWS, SYS / SWR, task `REQ-...`) in
+  a comment directly above it, in the format of `coding_rules.md` 8.6:
+  `/* [SWS_Dio_00133] [REQ-007-03] */`. A test without a requirement tag tests nothing
+  that was asked for. Update the matrix in `docs/autosar_compliance.md` (SWS) or
+  `docs/specs/traceability.md` (SYS / SWR).
+- Compile-only checks (`xat_add_compile_check`) and test `CMakeLists.txt` files carry the
+  tags of what they check in a comment as well.
 - Minimum per API: nominal case, each DET error (with DEV_ERROR_DETECT on),
   boundary values, and behaviour before `<Ma>_Init`.
 - Tests must be independent: `setUp()` resets module state (a test-only

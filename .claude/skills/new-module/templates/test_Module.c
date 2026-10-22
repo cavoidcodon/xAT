@@ -15,7 +15,7 @@ void tearDown(void)
 {
 }
 
-/* [SWS_<Ma>_xxxxx] TODO: requirement ID */
+/* [SWS_<Ma>_xxxxx] [REQ-<task>-nn] TODO: IDs of every requirement this test covers (coding_rules.md 8.6) */
 void test_Init_NullConfig_ReportsParamPointerDetError(void)
 {
     Det_ReportError_ExpectAndReturn(<MA>_MODULE_ID, 0U, <MA>_SID_INIT, <MA>_E_PARAM_POINTER, E_OK);

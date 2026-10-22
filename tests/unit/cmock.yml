@@ -1,0 +1,37 @@
+# Shared CMock settings for the xAT host unit tests (TASK-003, REQ-003-10).
+# Also read by the Unity test runner generator (it takes the :cmock: section), so that the
+# runners recognise the mock headers (mock_prefix) and call their Init / Verify / Destroy.
+:cmock:
+  :mock_prefix: mock_
+  :plugins:
+    - :ignore
+    - :ignore_arg
+    - :expect_any_args
+    - :array
+    - :callback
+    - :return_thru_ptr
+  # Every mocked AUTOSAR header gets the AUTOSAR types (uint8, Std_ReturnType ...).
+  :includes:
+    - Std_Types.h
+  # Calls must come in the expected order, and an unexpected call is a failure.
+  :enforce_strict_ordering: true
+  :fail_on_unexpected_calls: true
+  :when_ptr: :compare_data
+  # How Unity compares and prints the AUTOSAR types in failure messages.
+  :treat_as:
+    boolean: UINT8
+    uint8: HEX8
+    uint16: HEX16
+    uint32: HEX32
+    uint64: HEX64
+    sint8: INT8
+    sint16: INT16
+    sint32: INT32
+    sint64: INT64
+    uint8_least: UINT32
+    uint16_least: UINT32
+    uint32_least: UINT32
+    sint8_least: INT32
+    sint16_least: INT32
+    sint32_least: INT32
+    Std_ReturnType: HEX8

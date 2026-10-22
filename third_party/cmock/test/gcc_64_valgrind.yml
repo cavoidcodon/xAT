@@ -1,0 +1,41 @@
+# =========================================================================
+#   CMock - Automatic Mock Generation for C
+#   ThrowTheSwitch.org
+#   Copyright (c) 2007-26 Mike Karlesky, Mark VanderVoord, & Greg Williams
+#   SPDX-License-Identifier: MIT
+# =========================================================================
+
+# gcc with debug symbols enabled for meaningful valgrind output.
+# Used by the CI valgrind job to check for memory leaks and errors.
+
+---
+:tools:
+  :test_compiler:
+    :name: compiler
+    :executable: gcc
+    :arguments:
+    - "-c"
+    - "-g"
+    - "-Wall"
+    - "-Wno-address"
+    - "-std=c99"
+    - "-pedantic"
+    - '-I"${5}"'
+    - "-D${6}"
+    - "${1}"
+    - "-o ${2}"
+  :test_linker:
+    :name: linker
+    :executable: gcc
+    :arguments:
+    - "${1}"
+    - "-lm"
+    - "-o ${2}"
+:extension:
+  :object: ".o"
+  :executable: ".exe"
+:defines:
+  :test:
+  - UNITY_INCLUDE_DOUBLE
+  - UNITY_SUPPORT_TEST_CASES
+  - UNITY_SUPPORT_64

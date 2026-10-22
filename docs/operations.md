@@ -238,20 +238,32 @@ FLASHERS[OpenOcdFlash.name] = OpenOcdFlash   # the only other line needed
 
 ## Firmware build notes (out-of-tree SDK build)
 
-The default app is `src/ecu` (the AUTOSAR firmware entry, created in TASK-003). The
-bring-up firmware `src/hello_uart` from TASK-001 was removed in TASK-002. These facts
-from the bring-up still apply to `src/ecu/CMakeLists.txt`:
+The default app is `src/ecu`, the AUTOSAR firmware entry (TASK-003). Today `main.c`
+initialises the board, prints `xAT ecu: boot OK` and idles; `EcuM` takes over the start-up
+in TASK-010. `src/ecu/CMakeLists.txt` works like this:
 
 - The project is built out of tree. It sets
   `PROJECT_BOARD_PORT_PATH=examples/_boards/frdmmcxn947/demo_apps/hello_world`, which is
   resolved relative to `SdkRootDirPath`. This reuses the SDK's `hardware_init.c`
   (`BOARD_InitHardware`), `pin_mux.c`, `app.h`, `board.c` and `clock_config.c`, so **no
-  SDK file is copied**.
+  SDK file is copied**. This board port is a temporary integration shortcut until `Mcu` /
+  `Port` take over (TASK-005/006).
 - Skeleton: `include(${SdkRootDirPath}/cmake/extension/mcux.cmake)`, then
-  `project(<name> LANGUAGES C CXX ASM PROJECT_BOARD_PORT_PATH ...)`,
-  `include(${SdkRootDirPath}/CMakeLists.txt)`, `mcux_add_source(...)`, the optional
-  board `reconfig.cmake`, and `mcux_convert_binary(...)`.
+  `project(ecu LANGUAGES C CXX ASM PROJECT_BOARD_PORT_PATH ...)`,
+  `include(${SdkRootDirPath}/CMakeLists.txt)`, `include(cmake/xat_module.cmake)`, one
+  `xat_add_module(...)` line per module, `xat_add_project_sources(SOURCES main.c)`, the
+  optional board `reconfig.cmake`, and `mcux_convert_binary(...)`.
+- **Adding a module** takes one line:
+  `xat_add_module(NAME <Ma> DIR ${XAT_ROOT}/src/<layer>/<Ma>)`. It adds `src/*.c` and
+  `config/*.c` as sources and `include/` and `config/` as include directories; a module
+  without `.c` files (e.g. `Platform`) is header-only.
+- Project sources get the strict flags `-std=c11 -Wall -Wextra -Wpedantic -Wconversion
+  -Wshadow -Werror` (`XAT_PROJECT_C_FLAGS` in `cmake/xat_module.cmake`, shared with the
+  host unit tests). SDK sources keep the vendor flags (`-std=gnu99`).
 - The debug build adds `-g3` with `mcux_add_configuration(TARGETS debug CC "-g3" TOOLCHAINS armgcc)`,
-  because the SDK debug config only has `-O0 -g`. Project sources are compiled with
-  `-std=c11`, and SDK sources keep the vendor `-std=gnu99`.
-- The image is named `<app dir name>_<core_id>`, for example `ecu_cm33_core0.elf`.
+  because the SDK debug config only has `-O0 -g`.
+- The image is named `<app dir name>_<core_id>`: `ecu_cm33_core0.elf` / `.bin`; the map
+  file is `output.map` (SDK default name).
+
+Host unit tests (Unity + CMock) are built separately with the native gcc: see
+[unit_testing.md](unit_testing.md).

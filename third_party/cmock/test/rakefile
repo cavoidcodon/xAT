@@ -1,0 +1,166 @@
+# =========================================================================
+#   CMock - Automatic Mock Generation for C
+#   ThrowTheSwitch.org
+#   Copyright (c) 2007-26 Mike Karlesky, Mark VanderVoord, & Greg Williams
+#   SPDX-License-Identifier: MIT
+# =========================================================================
+
+
+require '../config/test_environment'
+require 'rake'
+require 'rake/clean'
+require 'rake/testtask'
+require './rakefile_helper'
+
+include RakefileHelpers
+
+DEFAULT_CONFIG_FILE = 'gcc.yml'
+CMOCK_TEST_ROOT = File.expand_path(File.dirname(__FILE__))
+
+SYSTEM_TEST_SUPPORT_DIRS = [
+  File.join(CMOCK_TEST_ROOT, 'system/generated'),
+  File.join(CMOCK_TEST_ROOT, 'system/build')
+]
+
+SYSTEM_TEST_SUPPORT_DIRS.each do |dir|
+  directory(dir)
+  CLOBBER.include(dir)
+end
+
+$cmock_test_config_file = DEFAULT_CONFIG_FILE
+$cmock_test_overlay_file = nil
+$cmock_test_seed = nil
+
+task :prep_system_tests => SYSTEM_TEST_SUPPORT_DIRS
+task :default => [:test]
+task :ci      => [:no_color, :default, 'test:examples', 'style:check', 'test:summary']
+task :cruise  => :ci
+
+desc "Load configuration"
+task :config, [:config_file, :cmock_overlay] do |t, args|
+  $cmock_test_config_file = args[:config_file]
+  $cmock_test_overlay_file = args[:cmock_overlay]
+end
+
+desc "Fix the minitest random seed for repeatable Ruby unit test ordering"
+task :seed, [:seed_value] do |t, args|
+  $cmock_test_seed = args[:seed_value]
+  ENV['TESTOPTS'] = "#{ENV['TESTOPTS']} --seed=#{$cmock_test_seed}".strip
+end
+
+task :config_toolchains do 
+  configure_toolchain($cmock_test_config_file, $cmock_test_overlay_file)
+end
+
+# Still support testing everything with just 'test' but switch default to ceedling-like test:all
+task :test => ['test:all']
+
+namespace :test do
+  desc "Run all unit, c, and system tests"
+  task :all => [:config_toolchains, :clobber, :prep_system_tests, 'test:unit', 'test:c', 'test:system']
+
+  desc "Run Unit Tests"
+  task :unit => [:config_toolchains, :prep_system_tests] do
+    run_ruby_unit_tests
+  end
+
+  #individual unit tests
+  namespace :unit do
+    FileList['unit/*_test.rb'].each do |test|
+      desc "Run unit test #{File.basename(test,'.*')}"
+      Rake::TestTask.new(File.basename(test,'.*').sub('_test','') => [:config_toolchains]) do |t|
+        t.pattern = test
+        t.verbose = true
+      end
+    end
+  end
+
+  desc "Run C Unit Tests"
+  task :c => [:config_toolchains, :prep_system_tests] do
+    unless (unsupported_tests.include? "C")
+      build_and_test_c_files
+    end
+  end
+
+  desc "Run System Tests"
+  task :system => [:config_toolchains, :clobber, :prep_system_tests] do
+    report "\nRunning system tests..."
+    tests_failed = run_system_test_interactions(FileList['system/test_interactions/*.yml'])
+    raise "System tests failed." if (tests_failed > 0)
+
+    run_system_test_compilations(FileList[SYSTEST_COMPILE_MOCKABLES_PATH + '*.h'])
+  end
+
+  #individual system tests
+  namespace :system do
+    FileList['system/test_interactions/*.yml'].each do |test|
+      basename = File.basename(test,'.*')
+      desc "Run system test #{basename}"
+      task basename => [:config_toolchains, :prep_system_tests] do
+        run_system_test_interactions([test])
+      end
+    end
+    FileList[SYSTEST_COMPILE_MOCKABLES_PATH + '*.h'].each do |test|
+      basename = File.basename(test,'.*')
+      desc "Run system test #{basename}"
+      task basename => [:config_toolchains, :prep_system_tests] do
+        run_system_test_compilations([test])
+      end
+    end
+  end
+
+  desc "Test cmock examples"
+  task :examples => [:config_toolchains, :prep_system_tests] do
+    run_examples()
+  end
+
+  desc "Profile Mock Generation"
+  task :profile => [:config_toolchains, :clobber, :prep_system_tests] do
+    run_system_test_profiles(FileList[SYSTEST_COMPILE_MOCKABLES_PATH + '*.h'])
+  end
+
+  desc "Generate test summary"
+  task :summary do
+    report_summary
+  end
+end
+
+task :no_color do
+  $colour_output = false
+end
+
+################### CODING STYLE VALIDATION
+namespace :style do
+  desc "Check style"
+  task :check => [:config_toolchains] do
+    report "\n"
+    report "--------------------\n"
+    report "VERIFYING RUBY STYLE\n"
+    report "--------------------\n"
+    execute("rubocop ../lib ../examples ../config ../scripts --config ../vendor/unity/test/.rubocop.yml", true)
+    report "Styling Ruby:PASS"
+  end
+
+  desc "Fix Style of all C Code"
+  task :c => [:config_toolchains]do
+    run_astyle("../src/*.*")
+  end
+
+  desc "Attempt to Autocorrect style"
+  task :auto => [:config_toolchains, 'style:clean'] do
+    execute("rubocop ../lib ../examples ../config ../scripts --autocorrect --config ../vendor/unity/test/.rubocop.yml", true)
+    report "Autocorrected What We Could."
+  end
+
+  desc "Update style todo list"
+  task :todo => [:config_toolchains, 'style:clean'] do
+    execute("rubocop ../lib ../examples ../config ../scripts --auto-gen-config --config ../vendor/unity/test/.rubocop.yml", true)
+    report "Updated Style TODO List."
+  end
+
+  task :clean => [:config_toolchains] do
+    File.delete(".rubocop_todo.yml") if File.exist?(".rubocop_todo.yml")
+  end
+end
+
+task :style => [:config_toolchains, 'style:check']

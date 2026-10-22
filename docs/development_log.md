@@ -734,3 +734,109 @@ Documentation only (no build, no unit tests, task section 0).
 | AC4 script: Com-mapped elements vs can_matrix | 21 elements: signal name in its message, ID, matrix scaling present |
 | AC6 script: overview ports vs composition | same 28 ports; every periodic runnable in the overview schedule |
 | AC7 `git diff --stat ad00113 -- docs/specs/ docs/architecture/system/` | empty |
+
+## 2026-10-22: TASK-003 platform types, firmware entry, CMake helpers, Unity + CMock
+
+### Summary
+
+- Platform headers in `src/platform/include/` (header-only, only `<stdint.h>` included):
+  - `Platform_Types.h`: CPU symbols (`CPU_TYPE_32`, `LSB_FIRST`, `LOW_BYTE_FIRST`),
+    `boolean`, `TRUE` / `FALSE`, `uint8..uint64`, `sint8..sint64`, `*_least`, `float32`,
+    `float64`, `VoidPtr`, `ConstVoidPtr`;
+  - `Std_Types.h`: `Std_ReturnType`, `E_OK` / `E_NOT_OK` (`STATUSTYPEDEFINED`), `STD_*`,
+    `Std_VersionInfoType`, transformer error and message types,
+    `Std_ExtractProtocolHeaderFieldsType`;
+  - `Compiler.h`: compiler symbols `_GCC_C_CORTEXM33_` (target) / `_GCC_C_AARCH64_` (host),
+    `AUTOMATIC`, `TYPEDEF`, `NULL_PTR`, `INLINE`, `LOCAL_INLINE`, GCC >= 13 check;
+  - `Compiler_Cfg.h`: empty (DEV-01);
+  - published information in the three main headers: vendor `0xFFFF`, module IDs
+    Platform 199 / Std 197 / Compiler 198, AR 4.7.0, SW 1.0.0.
+- Firmware entry `src/ecu/` (`CMakeLists.txt`, `prj.conf`, `main.c`): SDK hello_world board
+  port, banner `xAT ecu: boot OK`, idle loop, place of `EcuM_Init()` marked for TASK-010,
+  `_Static_assert` block that checks the type widths, `boolean`, `CPU_TYPE` and the byte
+  order for the target compiler at every build.
+- `cmake/xat_module.cmake`: `xat_add_module(NAME DIR)` (header-only modules supported),
+  `xat_add_project_sources(SOURCES)`, `XAT_PROJECT_C_FLAGS` (shared with the host tests).
+- `cmake/xat_unit_test.cmake`: `xat_add_unit_test(NAME SOURCES MOCKS INCLUDES DEFINES
+  [PASS_REGEX])` (CMock mocks and Unity runner generated per test) and
+  `xat_add_compile_check(NAME HEADERS SOURCES INCLUDES)` (each header alone, include guard).
+- `third_party/unity` (Unity v2.7.0) and `third_party/cmock` (CMock v2.7.0): complete tag
+  archives, SHA-256 in `third_party/README.md`. The three Makefiles that Unity's own
+  `.gitignore` hides are added with `git add -f`.
+- Tests in `tests/unit/`: `platform/` (`test_Platform_Types.c` 20 tests, `test_Std_Types.c`
+  10, `test_Compiler.c` 6, compile checks for the four headers and two predefined-symbol
+  cases), `framework/` (`test_CMock_Selftest.c` 2 tests, guard `test_CMock_Guard.c` with
+  two tests that must fail).
+- Every definition and test carries its requirement tags (`[SWS_...]`, `[REQ-003-xx]`), as
+  the user asked; `docs/unit_testing.md` gives the grep command that lists them.
+- Docs: `docs/modules/Platform/design.md` + `component.puml`, `docs/unit_testing.md` (new);
+  `docs/setup_host.md` (section 5 Ruby), `docs/operations.md` (firmware build notes),
+  `docs/autosar_compliance.md` (sections Platform, Std, Compiler: 97 rows),
+  `docs/architecture/overview.md` (design link), `third_party/README.md`.
+- Rules and skills: `coding_rules.md` 2.1 (SWS spelling also wins over 1.3), 3.1
+  (`Platform_Types.h` may use `<stdint.h>`), DEV-01 text completed; `verify` skill step 2
+  final; `new-module` skill creates `tests/unit/<layer>/<Ma>/CMakeLists.txt` from the new
+  template `CMakeLists_test.txt` and registers the module in both builds.
+- Host: Ruby 3.2.3 installed (`sudo apt-get install -y ruby`).
+
+### Decisions
+
+From the approved plan (2026-10-22):
+
+- **D1.** The AUTOSAR integer types map onto the `<stdint.h>` exact-width types. Reason:
+  newlib defines `uint32_t` as `unsigned long` on the target and glibc as `unsigned int` on
+  the host. A hand-written `unsigned int` would have the right width but give
+  incompatible-pointer errors (GCC 15) whenever MCAL passes a `uint32 *` to the SDK. This
+  replaces the "must not use `long`" note of the task context; the widths are checked on
+  both compilers. The `*_least` types are fixed to 32 bit on both.
+- **D2.** The non-draft transformer and message types of `Std_Types.h` are implemented;
+  the draft ones (SWS_Std_00027..00029) are not.
+- **D3.** The compiler symbol keeps the SWS spelling with the leading underscore (MISRA
+  C:2012 Rule 21.1 deviation comment). One `Compiler.h` serves the two compiler / platform
+  pairs and stops with `#error` on any other.
+- **D4.** Task open questions: Unity / CMock vendored as release snapshots (a); Ruby
+  installed; SDK hello_world board port reused until `Mcu` / `Port`; `PRINTF` for the
+  banner; framework self-test kept permanently, plus the automatic guard test.
+- **D6.** `new-module` template for the test `CMakeLists.txt`.
+- **D5.** Requirement tags are a permanent rule (user, 2026-10-22): `coding_rules.md` 8.6
+  (format, ID kinds incl. task `REQ-<task>-nn`, placement on the smallest unit, also in
+  CMake / config files, grep command), `testing_rules.md` (every test tagged), `verify`
+  skill step 6 (tag check), `new-module` templates (`Module.c`, `test_Module.c`);
+  `docs/specs/README.md` workflow step 3 refers to 8.6 (wording only, no requirement
+  changed).
+
+### Deviations and findings
+
+- The map file is `output.map` (SDK default name), not `ecu_cm33_core0.map` as AC1 says.
+- Beyond the task file: three test files instead of one (one per SWS), compile checks,
+  the guard test, the `new-module` template and the `coding_rules.md` changes (all in the
+  approved plan).
+- The CMock-generated mocks and the Unity runners compile without any warning under the
+  strict flags; no `-Wno-*` exception was needed (plan risk did not occur).
+- The first `ops run` after connecting the board failed the pyOCD read-back verify at one
+  byte (`0x470`: memory `0x84`, file `0x80`). The next `ops flash --flasher pyocd` and two
+  `ops run` passed verify; not reproduced. Watch for it in later flash runs.
+- Module IDs and abbreviations checked against `AUTOSAR_TR_BSWModuleList` R21-11 (document
+  150, added to `docs/references/autosar/` by the user): `Std` 197, `Compiler` 198,
+  `Platform` 199.
+- TASK-009 (OS) must define `StatusType` and `E_OK` inside `#ifndef STATUSTYPEDEFINED`
+  (`docs/modules/Platform/design.md` decision 4).
+
+### Verification (2026-10-22)
+
+`ops` = `python3 scripts/operations.py`.
+
+| AC | Command | Result |
+|---|---|---|
+| AC0 | — | plan approved before any change (2026-10-22) |
+| AC1 | `ops -v build --clean` | exit 0, 0 warnings in the whole build log; `ecu_cm33_core0.elf` / `.bin` and `output.map`; text 16592, data 20, bss 3444 |
+| AC2 | `ops --config release build --clean` | exit 0; text 9564, data 20, bss 3444 |
+| AC3 | `ops run --expect "xAT ecu: boot OK" --timeout 15`, then `ops monitor --expect ...` | exit 0 / exit 0, banner received (pyOCD); first attempt: verify mismatch, see findings |
+| AC4 | `cmake -G Ninja -S tests/unit -B build/unit && cmake --build build/unit && ctest --test-dir build/unit --output-on-failure` | clean build: 0 warnings; 5/5 CTest tests passed (38 test cases + guard) |
+| AC5 | manual, then reverted (files compared with backups: identical) | broken assertion (`8U` -> `9U`): `test_Platform_Types` FAIL "Expected 9 Was 8", ctest exit 8; unmet expectation (extra `DummyDep_Write_Expect`): FAIL "Called fewer times than expected.", ctest exit 8; `#ifndef TRUE` removed: build fails "TRUE redefined"; `STATUSTYPEDEFINED` guard removed: build fails "E_OK redefined". Automatic: `test_CMock_Guard` passes only on both failures + summary |
+| AC6 | `verify` step 3 greps; `grep '#include' src/platform` | both greps empty; platform headers include only `<stdint.h>` and each other |
+| AC7 | SHA-256 of all SDK files before (= TASK-001 baseline) and after all builds | 123,843 files, identical |
+| AC8 | `diff -r` of `third_party/unity`, `third_party/cmock` against the extracted tag archives (after the builds) | identical; only the two empty CMock `vendor/` directories are missing |
+| AC9 | review | docs listed in the summary updated |
+| — | script: compliance matrix vs tags in `src/` and `tests/` | 65 Implemented / Partial IDs, all tagged in code; tests or compile checks cover all but SWS_Platform_00002 and SWS_Std_00004 (verified by review) |
+| — | `plantuml -checkonly docs/modules/Platform/component.puml`, render | rc = 0, diagram viewed |

@@ -137,7 +137,21 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 sudo usermod -aG dialout $USER     # log out and in again
 ```
 
-## 5. Check
+## 5. Ruby (host unit tests)
+
+**sudo**. Added in TASK-003 (2026-10-22). CMock generates the mocks and the Unity runner
+generator writes the test runners with Ruby; both need only Ruby's standard library, so no
+gem is installed. The host unit tests themselves use the Ubuntu `gcc` (13.3.0, aarch64) and
+the CMake / Ninja from the venv (section 2).
+
+```sh
+sudo apt-get install -y ruby       # Ubuntu 24.04: ruby 3.2.3
+ruby --version
+```
+
+How to build and run the tests: [unit_testing.md](unit_testing.md).
+
+## 6. Check
 
 ```sh
 python3 scripts/operations.py doctor
@@ -146,3 +160,5 @@ python3 scripts/operations.py doctor
 Every required line must be `[OK  ]`, and the exit code must be 0. J-Link and west are
 optional and show as `--` when they are not installed. J-Link would need a J-Link probe, or
 the MCU-Link reflashed with J-Link firmware, which is not done here.
+
+`doctor` does not check Ruby yet; `ruby --version` must print 3.2 or newer.
