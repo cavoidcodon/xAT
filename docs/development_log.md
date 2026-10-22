@@ -641,3 +641,96 @@ The system design follows the spec update of N-01 .. N-11 (commit `0fcaba6`):
 
 - `docs/architecture/system/system_design.md` (v0.2): status `Draft (for review)` -> `Approved`
   after the user review. It is now the approved input for the SWC composition (TASK-027).
+
+## 2026-10-21: TASK-027 SWC composition
+
+### Summary
+
+- New `docs/architecture/swc_composition.md` (v0.1, design draft) with these sections:
+  - five SWCs and the boundary between fault detection and fault decision;
+  - allocation of all 61 `Approved` SYS requirements: 33 application, 28 not application;
+  - port table: 28 ports, 48 data elements / operations;
+  - RTE mapping to `Com`, `IoHwAb` and BSW services, with the target in the hardware variant
+    (DC-01);
+  - `IoHwAb` signal list for TASK-028: `FaultLampLed`;
+  - task schedule, end-to-end latency, initialisation, data consistency, execution-time
+    budget;
+  - operating modes;
+  - decisions, findings, assumptions, design inputs to the BSW, RTE and OS tasks.
+- New diagrams:
+  - `docs/architecture/swc_composition.puml`, two pages: data flow between the SWCs, and the
+    ports mapped by the RTE to `Com`, `IoHwAb` and the BSW services;
+  - `docs/architecture/swc_task_cycle.puml`: one `OsTask_10ms` activation in order, the
+    100 ms activation, the 1 ms preemption.
+- `docs/architecture/overview.md`:
+  - layer picture with the five SWCs, `BswM`, `Dem`, `CanSM`, `IoHwAb` and the debug UART
+    CDD;
+  - new module rows;
+  - link from the SWCs row to the composition;
+  - *Signal flow* table (every RTE port) and *Scheduling* table filled;
+  - new `IoHwAb` statement.
+- `CLAUDE.md`, `.claude/rules/layering.md`: `IoHwAb` serves the board I/O now; the hardware
+  variant adds the sensor and actuator signals.
+- `.claude/rules/layering.md` (G-06): a BSW service module with AUTOSAR service ports
+  (`BswM`, `Dcm`, `Dem`) may include its own `Rte_<Ma>.h`.
+- Backlog:
+  - TASK-018 renamed to "sensor input"; TASK-017 title names the mapping targets;
+  - TASK-021 depends on TASK-030;
+  - new tasks: TASK-029 `CanSM`, TASK-030 `BswM`, TASK-031 debug UART CDD `DbgOut`.
+- TASK-027.md: count of `Approved` SYS corrected from 62 to 61 (G-01).
+
+### Decisions
+
+User decisions (2026-10-21):
+
+- `SwcVehicleSpeed` takes `SIM_Speed` and `SIM_Analog` and is renamed `SwcSensorInput`.
+- Minimal `CanSM` and `BswM` are new tasks:
+  - `CanSM` does the bus-off recovery;
+  - `BswM` starts the TCU_Tx I-PDU group only when control is active AND `28` does not
+    disable Tx.
+- `SYS-HMI-002` gets its port and runnable now, plus a debug UART CDD task.
+
+Decisions from the approved plan (composition section 6.1):
+
+- **D4.** The detecting SWC reports the fault condition; `SwcFaultMgr` only latches,
+  aggregates and decides.
+- **D5.** One SWC per received message evaluates the `Rte_Read` status.
+- **D6.** Every `TCU_*` signal is written directly by its producer.
+- **D7.** All S/R access is explicit.
+- **D8.** Mode switch ports, with a simplification for the handwritten RTE.
+- **D9.** Init ends on a limp-home fault, or when the selector is known and the vehicle
+  speed is valid.
+- **D10.** No watchdog port; the watchdog is served last in `OsTask_10ms`.
+- **D11.** `SwcFaultMgr` reports the Dem events.
+
+The order of the main functions and runnables in `OsTask_10ms` is a design input. Each BSW
+module design confirms it or reports a conflict.
+
+### Deviations and findings
+
+- Deviation: `swc_composition.puml` page 1 draws the data flow between the SWCs (component to
+  component, with the ports on the arrows), not lollipop interfaces. The interface layout was
+  3400 px wide and could not be read. Page 2 keeps the interfaces.
+  `portin` / `portout` are not supported by PlantUML 1.2020.02.
+- Findings G-02 .. G-05, G-07 and G-08 wait for the user. The specs and the system design are
+  unchanged.
+  - G-02: invalid throttle.
+  - G-03: GearActual / GearTarget semantics.
+  - G-04: no `SYS-FLT-003` exception for `28 01 01`.
+  - G-05: vehicle speed above 250 km/h.
+  - G-07: TASK reference in `system_design.md` section 1.
+  - G-08: PCS characteristic for `SYS-SEN-006`.
+
+### Verification
+
+Documentation only (no build, no unit tests, task section 0).
+
+| Check | Result |
+|---|---|
+| AC1 `plantuml -checkonly docs/architecture/*.puml` | rc = 0 |
+| AC1 render to the scratchpad | rc = 0; both pages of `swc_composition` and `swc_task_cycle` viewed, layout readable |
+| AC2 script: Approved SYS vs allocation tables | 61 Approved, 61 rows (33 + 28), no duplicate, missing or extra ID |
+| AC3 script: port table cells, BSW-mapped ports in the mapping table, runnables in tasks | 48 rows complete, every BSW / Com peer mapped, 11 runnables each in exactly one task |
+| AC4 script: Com-mapped elements vs can_matrix | 21 elements: signal name in its message, ID, matrix scaling present |
+| AC6 script: overview ports vs composition | same 28 ports; every periodic runnable in the overview schedule |
+| AC7 `git diff --stat ad00113 -- docs/specs/ docs/architecture/system/` | empty |

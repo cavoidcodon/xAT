@@ -1,0 +1,124 @@
+@startuml swc_task_cycle
+title Task cycle - one OsTask_10ms activation and the 100 ms activation (TASK-027)
+
+participant "OS\n(1 ms counter)" as OS
+participant "OsTask_1ms\nprio 3" as T1
+participant "OsTask_10ms\nprio 2" as T10
+participant "Com" as Com
+participant "CanSM" as CanSM
+participant "SwcSensorInput" as SI
+participant "SwcGearSelector" as GS
+participant "SwcShiftCtrl" as SC
+participant "SwcFaultMgr" as FM
+participant "SwcSolenoidCtrl" as SOL
+participant "BswM" as BswM
+participant "IoHwAb" as IoHwAb
+participant "CanTp / Dcm" as Diag
+participant "Wdg / WdgM" as Wdg
+participant "OsTask_100ms\nprio 1" as T100
+participant "DbgOut CDD" as DbgOut
+
+note over OS, DbgOut
+Covers: swc_composition.md section 4 (SYS-TIM-001, SYS-FLT-003, SYS-ACT-004, SYS-COM-004, SYS-STA-002, SYS-HMI-002).
+All tasks are basic tasks (BCC1), full-preemptive, AUTOSAR OS SC1. All are released at the same tick; the priority gives the order.
+The RTE calls the runnables in the configured order (RtePositionInTask); explicit Rte_Read / Rte_Write.
+end note
+
+== t = 0 ms: release of OsTask_1ms, OsTask_10ms (and, at t = 0 of every 100 ms period, OsTask_100ms) ==
+OS -> T1 : ActivateTask
+activate T1
+T1 -> T1 : Can_MainFunction_BusOff, _Read, _Write, _Mode\n(Rx indication -> CanIf -> PduR -> Com_RxIndication:\nI-PDU copied, signal update deferred)
+deactivate T1
+OS -> T10 : ActivateTask
+activate T10
+T10 -> Com : 1 Com_MainFunctionRx
+note right of Com
+deferred signal update; deadline monitoring
+(30 ms, detected 30 .. 40 ms after the last frame);
+timeout -> substitute values; notifications ->
+RTE status per signal (never received / timeout)
+end note
+T10 -> CanSM : 2 CanSM_MainFunction
+note right of CanSM
+bus-off recovery; state change ->
+BswM_CanSM_CurrentState -> Rte_Switch CanBusState
+(immediate), visible to SwcFaultMgr in this cycle
+end note
+T10 -> SI : 3 SwcSensorInput_Run10ms
+note right of SI
+reads RpShaftSpeedIn, RpAnalogIn (value + status)
+writes VehicleSpeed, Standstill, ShaftSpeeds, OilTemp,
+LinePress, SensorFaults, OilTemp (TCU_Status)
+end note
+T10 -> GS : 4 SwcGearSelector_Run10ms
+note right of GS
+reads RpDriverIn (value + status), VehicleSpeed, Standstill
+writes SelectorPosition, SelectorState, RLS / SLS,
+SelectorFaults, ProgPrecondMask
+end note
+T10 -> SC : 5 SwcShiftCtrl_Run10ms
+note right of SC
+reads RpThrottleIn, SelectorPosition, VehicleSpeed, Standstill,
+ShaftSpeeds, OilTemp, TcuMode (from the previous cycle)
+writes GearTarget, GearActual, ShiftInProgress, Throttle, ShiftFaults
+end note
+T10 -> FM : 6 SwcFaultMgr_Run10ms
+note right of FM
+reads SensorFaults, SelectorFaults, ShiftFaults, PressureFault
+(from the previous cycle), CanBusState, VehicleSpeed
+latch (SYS-FLT-004 / -008), FaultBits, mode decision (D9, SYS-FLT-002):
+Rte_Switch TcuMode on change; writes Mode, FaultBits, FaultLamp,
+IRVs for Run100ms; Dem events (TASK-025)
+end note
+FM -> IoHwAb : FaultLamp (RTE fan-out) -> FaultLampLed -> Dio
+note right of IoHwAb: red LED switched in this cycle,\nindependent of CAN (SYS-FLT-003 bus-off case)
+T10 -> SOL : 7 SwcSolenoidCtrl_Run10ms
+note right of SOL
+reads GearTarget, ShiftInProgress, Throttle, SelectorPosition, RLS,
+LinePress, FaultBits, TcuMode (this cycle)
+writes SS_A, SS_B, PCS_Duty (limp-home: OFF, OFF, 0 %), PressureFault
+end note
+T10 -> BswM : 8 BswM_MainFunction
+note right of BswM
+TCU_Tx started iff TcuMode != INIT
+and the Dcm communication mode enables Tx;
+the first TCU_Actuators leaves in the cycle that ends Init (SYS-ACT-004)
+end note
+T10 -> Com : 9 Com_MainFunctionTx
+note right of Com
+TCU_Actuators in every call (10 ms +/- 1 ms, SYS-COM-004),
+TCU_Status in every 10th call (100 ms); AliveCtr in the Tx callout;
+fault reaction on the bus <= about 2.4 ms after the fault (section 4.1)
+end note
+T10 -> Diag : 10 CanTp_MainFunction, 11 Dcm_MainFunction
+note right of Diag
+Dcm reads ProgPrecondMask (10 02, RID 0x0203);
+28 -> BswM (immediate); after the main functions the
+variable diagnostic load does not move the Tx instant
+(12 Dem_MainFunction from TASK-025)
+end note
+T10 -> Wdg : 13 watchdog service (last)
+note right of Wdg: served only when the whole 10 ms task ran (D10);\nno service -> reset within the watchdog timeout (SYS-STA-002)
+deactivate T10
+
+group t = 0 of every 100 ms period, after OsTask_10ms has terminated
+  OS -> T100 : ActivateTask (released at t = 0, runs when no higher-priority task is ready)
+  activate T100
+  T100 -> FM : SwcFaultMgr_Run100ms
+  note right of FM
+  reads IrvTcuMode, IrvFaultBits, SelectorState, GearTarget,
+  GearActual, VehicleSpeed (each element <= 32 bit, atomic)
+  end note
+  opt every 5th activation (500 ms, SYS-HMI-002)
+    FM -> DbgOut : Rte_Call RpDebugOut WriteLine(status line)
+    DbgOut --> FM : E_OK / E_NOT_OK (busy: line dropped)
+  end
+  deactivate T100
+end
+
+== t = 1 ms .. 9 ms: OsTask_1ms preempts every lower-priority task ==
+OS -> T1 : ActivateTask (every 1 ms)
+activate T1
+T1 -> T1 : Can main functions; Rx indication, Tx confirmation,\nbus-off indication (BSW exclusive areas, section 4.3)
+deactivate T1
+@enduml

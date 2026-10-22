@@ -6,3 +6,4 @@ __pycache__/
 
 # AUTOSAR specifications (licensed, download locally)
 docs/references/autosar/*.pdf
+docs/references/autosar/AUTOSAR_*.md

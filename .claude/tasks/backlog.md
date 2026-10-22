@@ -24,15 +24,18 @@ MCAL tasks implement their AUTOSAR SWS.
 | TASK-014 | `PduR` | bsw/com | TASK-013 | TODO |
 | TASK-015 | `Com` (signals from `can_matrix.md`) | bsw/com | TASK-014 | TODO |
 | TASK-016 | Plant model and console (`tools/sim/`, SIM-PLT, SIM-CON) | tools | TASK-011 | TODO |
-| TASK-017 | `Rte` (handwritten, ports mapped to `Com`, DC-01) | rte | TASK-015, TASK-027, TASK-028 | TODO |
-| TASK-018 | SWCs: gear selector, vehicle speed, shift control, solenoid control, fault / mode manager (with SWR specs) | app | TASK-017, TASK-016, TASK-027 | TODO |
+| TASK-017 | `Rte` (handwritten; ports mapped to `Com`, `IoHwAb` and BSW services as in `swc_composition.md`, DC-01) | rte | TASK-015, TASK-027, TASK-028 | TODO |
+| TASK-018 | SWCs: gear selector, sensor input, shift control, solenoid control, fault / mode manager (with SWR specs; split and ports in `docs/architecture/swc_composition.md`) | app | TASK-017, TASK-016, TASK-027 | TODO |
 | TASK-019 | `Wdg` (+ `WdgIf` / `WdgM` decision) | mcal | TASK-010 | TODO |
 | TASK-020 | `CanTp` | bsw/com | TASK-014 | TODO |
-| TASK-021 | `Dcm` (application UDS services, entry to the bootloader on `10 02`) | bsw/services | TASK-020 | TODO |
+| TASK-021 | `Dcm` (application UDS services, entry to the bootloader on `10 02`) | bsw/services | TASK-020, TASK-030 | TODO |
 | TASK-022 | UDS tester (`tools/sim/`, SIM-TST) | tools | TASK-011 | TODO |
 | TASK-023 | PBL (`src/boot/pbl`) | boot | TASK-012, TASK-022 | TODO |
 | TASK-024 | SBL (`src/boot/sbl`) | boot | TASK-023 | TODO |
 | TASK-025 | `Dem` and `Dcm` services `14` / `19` (`SYS-FLT-007`; until then faults only in `TCU_Status.FaultBits`) | bsw/services | TASK-018, TASK-021 | TODO |
 | TASK-026 | System design: component and sequence diagrams for all approved system scenarios (PlantUML, `docs/architecture/system/`) | docs | — | DONE |
-| TASK-027 | SWC composition: RTE ports (signal flow), port -> `Com` mapping, runnable-to-task mapping (scheduling), `docs/architecture/swc_composition.md` | docs | TASK-026 | TODO |
+| TASK-027 | SWC composition: RTE ports (signal flow), port -> `Com` mapping, runnable-to-task mapping (scheduling), `docs/architecture/swc_composition.md` | docs | TASK-026 | DONE |
 | TASK-028 | `IoHwAb` (board I/O: red LED via `Dio`; extensible to sensor / actuator signals of the hardware variant) | bsw/ecual | TASK-007, TASK-027 | TODO |
+| TASK-029 | `CanSM` (minimal: bus-off recovery `SYS-COM-006`, state to `BswM`; no ComM) | bsw/com | TASK-013, TASK-030 | TODO |
+| TASK-030 | `BswM` (minimal: TCU_Tx I-PDU group = control active AND `28` state, start-up actions, bus-off mode to the application) | bsw/services | TASK-015, TASK-017 | TODO |
+| TASK-031 | Debug UART CDD `DbgOut` (status line `SYS-HMI-002` over the MCU-Link VCOM) | bsw (location decided in the task) | TASK-006, TASK-017 | TODO |

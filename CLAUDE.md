@@ -32,6 +32,8 @@ Dependency direction: `app -> rte -> bsw -> mcal -> NXP SDK`. The full include r
 SWCs reach sensor and actuator values only through RTE ports. Today the RTE maps those
 ports to `Com` signals; a later hardware variant maps them to `IoHwAb` without changing
 the SWCs (design constraints DC-01..05 in `docs/specs/system/system_context.md`).
+`IoHwAb` already exists for the board I/O (red LED of the fault lamp); the later hardware
+variant adds the sensor and actuator signals to it.
 
 # Repository layout
 
@@ -39,7 +41,7 @@ the SWCs (design constraints DC-01..05 in `docs/specs/system/system_context.md`)
 src/platform/        Std_Types.h, Platform_Types.h, Compiler.h
 src/mcal/<Ma>/       MCAL drivers (Mcu, Port, Dio, Gpt, Wdg, Can)
 src/bsw/services/    Det, EcuM, SchM, Dcm, ...
-src/bsw/ecual/       ECU abstraction (IoHwAb only for a later hardware I/O variant)
+src/bsw/ecual/       ECU abstraction: IoHwAb (board I/O; sensor / actuator signals in a later hardware variant)
 src/bsw/com/         communication stack (CanIf, PduR, Com, CanTp)
 src/os/              scheduler / OS
 src/rte/             handwritten RTE

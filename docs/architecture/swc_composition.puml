@@ -1,0 +1,122 @@
+@startuml swc_composition
+title SWC composition - page 1: ports between SWCs (TASK-027)
+
+note as Legend
+Covers: SWC split and intra-ECU ports of swc_composition.md sections 1 and 3.2.
+Arrow = data flow from the P-port Pp<Name> of the producer to the R-port Rp<Name>
+of the consumer; label = port (data elements). (n) = position in OsTask_10ms;
+dashed = read in the next cycle. All S/R ports are explicit, every 10 ms.
+Ports that also go to Com, IoHwAb or BSW services: page 2.
+end note
+
+component "SwcSensorInput\n(3) Run10ms" as SI
+component "SwcGearSelector\n(4) Run10ms" as GS
+component "SwcShiftCtrl\n(5) Run10ms" as SC
+component "SwcFaultMgr\n(6) Run10ms, Run100ms" as FM
+component "SwcSolenoidCtrl\n(7) Run10ms" as SOL
+
+SI --> GS : PpVehicleSpeed (VehicleSpeed)\nPpStandstill (Standstill)
+SI --> SC : PpVehicleSpeed, PpStandstill\nPpShaftSpeeds (InputShaftSpeed, OutputShaftSpeed)\nPpOilTemp (OilTempPhys, OilTempValid)
+SI --> FM : PpVehicleSpeed (end of Init D9, debug line)\nPpSensorFaults (ShaftSpeedInvalid, LinePressSensorFault,\nOilTempSensorFault, OilOverTemp,\nComFaultSimSpeed, ComFaultSimAnalog)
+SI --> SOL : PpLinePress (LinePress, LinePressValid)
+GS --> SC : PpSelectorPosition (SelectorPosition)
+GS --> FM : PpSelectorFaults (SelectorFault, SelectorFaultInD,\nSelectorKnown, ComFaultSimDriver)\nPpSelectorState (SelectorState, debug line)
+GS --> SOL : PpSelectorPosition\nPpLockSolenoidOut (RLS)
+SC --> FM : PpShiftFaults (ShiftFault, RatioFault)\nPpGearStatus (GearTarget, GearActual, debug line)
+SC --> SOL : PpGearStatus (GearTarget, ShiftInProgress)\nPpThrottle (Throttle)
+FM --> SOL : PpTcuMode (mode TcuMode)\nPpFaultBits (FaultBits: bits 4, 9 suspend SYS-SEN-006)
+FM ..> SC : PpTcuMode (mode TcuMode),\nread in the next cycle
+SOL ..> FM : PpSolenoidFaults (PressureFault),\nread in the next cycle
+
+note right of FM
+IRVs IrvTcuMode, IrvFaultBits:
+SwcFaultMgr_Run10ms -> SwcFaultMgr_Run100ms
+end note
+
+newpage
+
+title SWC composition - page 2: ports mapped by the RTE to Com, IoHwAb and BSW services (TASK-027)
+
+note as Legend2
+Covers: RTE mapping of swc_composition.md sections 3.3 .. 3.5 (DC-01, DC-02, DC-03).
+CAN-mapped data elements keep the can_matrix name and raw scaling;
+the physical conversion is done in the named SWC, never in the RTE.
+*In / *Out ports are mapped to Com today and to IoHwAb in the later hardware variant.
+AliveCtr is handled inside Com (I-PDU callouts) and is not a port.
+end note
+
+package "Application (src/app)" {
+  component "SwcSensorInput" as SI2
+  component "SwcGearSelector" as GS2
+  component "SwcShiftCtrl" as SC2
+  component "SwcFaultMgr" as FM2
+  component "SwcSolenoidCtrl" as SOL2
+}
+
+rectangle "RTE (src/rte, handwritten: copies data, maps ports, calls runnables)" {
+  interface "RpDriverIn\nSelector, Brake" as DIN
+  interface "RpThrottleIn\nThrottle" as TIN
+  interface "RpShaftSpeedIn\nInputShaftSpeed, OutputShaftSpeed" as SIN
+  interface "RpAnalogIn\nOilTempVoltage, LinePressVoltage" as AIN
+  interface "PpSolenoidOut\nSS_A, SS_B, PCS_Duty" as SOUT
+  interface "PpLockSolenoidOut\nRLS, SLS" as LOUT
+  interface "PpFaultLampOut\nFaultLamp" as FLOUT
+  interface "PpGearStatus, PpSelectorState,\nPpVehicleSpeed, PpOilTempStatus,\nPpModeStatus, PpFaultBits" as STAT
+  interface "PpProgPrecond\nProgPrecondMask" as PROG
+  interface "PpTcuMode (mode)" as MODE2
+  interface "RpCanBusState (mode)\nCANBUS_ONLINE, CANBUS_BUSOFF" as BUSST
+  interface "RpDebugOut (C/S)\nWriteLine" as DBG
+  interface "RpDemEvt<Fault> (C/S, 12 ports)\nSetEventStatus" as DEM
+}
+
+package "BSW (src/bsw)" {
+  component "Com" as Com
+  component "IoHwAb" as IoHwAb
+  component "BswM\n(TASK-030)" as BswM
+  component "CanSM\n(TASK-029)" as CanSM
+  component "Dcm" as Dcm
+  component "Dem\n(TASK-025)" as Dem
+  component "DbgOut CDD\n(TASK-031)" as DbgOut
+  component "PduR / CanIf / Can" as Lower
+  component "Dio" as Dio
+}
+
+GS2 ..> DIN
+SC2 ..> TIN
+SI2 ..> SIN
+SI2 ..> AIN
+SOL2 -- SOUT
+GS2 -- LOUT
+FM2 -- FLOUT
+SI2 -- STAT
+GS2 -- STAT
+SC2 -- STAT
+FM2 -- STAT
+GS2 -- PROG
+FM2 -- MODE2
+FM2 ..> BUSST
+FM2 ..> DBG
+FM2 ..> DEM
+
+Com --> DIN : SIM_Driver 0x100\nCom_ReceiveSignal + status
+Com --> TIN : SIM_Driver 0x100
+Com --> SIN : SIM_Speed 0x101
+Com --> AIN : SIM_Analog 0x102
+SOUT --> Com : TCU_Actuators 0x200\nCom_SendSignal
+LOUT --> Com : TCU_Actuators 0x200
+FLOUT --> Com : TCU_Actuators 0x200
+FLOUT --> IoHwAb : FaultLampLed\n(same value)
+STAT --> Com : TCU_Status 0x201
+PROG --> Dcm : read by Dcm\n(10 02, RID 0x0203)
+MODE2 --> BswM : Rte_Mode
+BswM --> BUSST : Rte_Switch
+DBG --> DbgOut : WriteLine
+DEM --> Dem : Dem_SetEventStatus
+
+CanSM --> BswM : BswM_CanSM_CurrentState
+Dcm --> BswM : BswM_Dcm_CommunicationMode_CurrentState (28)
+BswM --> Com : TCU_Tx I-PDU group start / stop
+Com --> Lower
+Lower --> CanSM : bus-off indication
+IoHwAb --> Dio : red LED, GPIO0 pin 10, active low
+@enduml

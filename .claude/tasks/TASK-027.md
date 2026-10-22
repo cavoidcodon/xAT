@@ -5,7 +5,7 @@
 | Priority     | P0 (input for `Rte` TASK-017, the SWC designs TASK-018 and the OS / `SchM` configuration TASK-009) |
 | Depends on   | TASK-026 (system design, DONE)                                                        |
 | Module(s)    | SWC composition (`docs/architecture/`), documentation only                            |
-| AUTOSAR doc  | `AUTOSAR_SWS_RTE` R21-11 (port / runnable terms only), `AUTOSAR_SWS_OS` (task model)  |
+| AUTOSAR doc  | `docs/references/autosar/AUTOSAR_SWS_RTE.md` R21-11 (port / runnable terms only), `docs/references/autosar/AUTOSAR_SWS_OS.md` R21-11 (task model); chapters in section 2 |
 
 ---
 
@@ -18,7 +18,7 @@ approved. The steps build, unit test and AUTOSAR compliance of `module-task` do 
 - the SWC split (section 3, item 1) with one line per SWC: the four SWCs in `overview.md`
   plus the fault / mode manager (open question 1), and the boundary between them (which SWC
   detects a fault, which one decides the mode);
-- the allocation of all 62 `Approved` `SYS-*` (application owner + contributors, or "not
+- the allocation of all 61 `Approved` `SYS-*` (application owner + contributors, or "not
   application" with the owning module);
 - the draft port list (name, interface, producer, consumer, period) - types and scaling may
   stay open in the plan but must be complete in the result;
@@ -50,7 +50,7 @@ been built without its port list. This task moves the composition in front of bo
 
 ## 2. Context (verified on 2026-10-18)
 
-- **Inputs, all `Approved`:** `system_requirements.md` (62 `Approved`, `SYS-BOOT-003` and
+- **Inputs, all `Approved`:** `system_requirements.md` (61 `Approved`, `SYS-BOOT-003` and
   `SYS-BOOT-012` `Deleted`), `system_context.md` (logical signals §3, parameters §4.1,
   operating modes §5, design constraints DC-01..05), `safety_goals.md`, `can_matrix.md` 1.3
   (single source for signals and scaling, DC-03; timeouts and substitute values §6),
@@ -69,6 +69,28 @@ been built without its port list. This task moves the composition in front of bo
   later hardware I/O variant. Decided (open question 4): `IoHwAb` is created now for the
   board I/O (red LED), as module task TASK-028. DC-01 in `system_context.md` stays true
   (sensor and actuator values still come from `Com`) and is not changed.
+- **AUTOSAR references (added 2026-10-19):** `docs/references/autosar/AUTOSAR_SWS_RTE.md`
+  (doc 84, ~80 000 lines) and `docs/references/autosar/AUTOSAR_SWS_OS.md` (doc 34,
+  ~18 000 lines), both CP R21-11, converted from the PDF. The headings have no Markdown `#`
+  and the tables are broken by the conversion; find a chapter with
+  `grep -nE '^<chapter number> '` and use the table of contents at the top of each file
+  (RTE lines ~300..900, OS lines ~270..520). Read only the chapters below; they are used for
+  terms, naming and the task model, not as requirements on a generator (the RTE is
+  handwritten).
+  - RTE: 4.2.2.6 mapping of runnables to OS tasks, 4.2.2.8 `TimingEvent` activated runnables,
+    4.2.4 cyclic execution, 4.2.6 data consistency (exclusive areas, inter-runnable
+    variables), 4.3.1 sender-receiver (4.3.1.5 implicit / explicit, 4.3.1.7 time-out,
+    4.3.1.8 invalidation), 4.3.3.1 inter-runnable variables, 4.4 modes (mode user / mode
+    manager), 4.6.2 initialisation of SWCs, 5.2.6.4 API naming conventions, 5.6 API
+    (`Rte_Read` / `Rte_Write`, `Rte_IRead` / `Rte_IWrite`, `Rte_Switch`, `Rte_Call`),
+    5.7.5 triggering events (5.7.5.1 `TimingEvent`, 5.7.5.14 `InitEvent`), 5.8 `Rte_Start`,
+    5.9.1 RTE-COM naming.
+  - OS: 4.3 interaction with the RTE, 7.1 core OS (OSEK OS basis, restrictions and
+    extensions), 7.3 schedule tables (periodic activation), 7.11 scalability classes (SC1
+    expected: single core, no protection), 7.12 hook functions, 8.4 schedule-table and
+    counter API. The OSEK task model itself (basic / extended tasks, priorities,
+    `ActivateTask`, alarms, conformance classes) is defined in OSEK/VDX OS 2.2.3 (ISO
+    17356-3), which is not in `docs/references/`; the plan states which OSEK terms are used.
 - **Template:** `.claude/skills/swc-design/templates/composition.md`.
 - **Rules:** `.claude/rules/app_rules.md` (ports only via `Rte_<Swc>.h`, RTE without control
   logic, every port listed in `overview.md`), `layering.md`.
@@ -180,7 +202,7 @@ The plan proposes a port and an RTE mapping for each:
 |---|---|---|
 | AC0 | The plan (split, allocation, draft ports, draft scheduling, latency estimate) was approved before any file was written | — |
 | AC1 | Every `.puml` file renders without error | `plantuml -checkonly docs/architecture/*.puml`; render to the scratchpad and look at each diagram |
-| AC2 | All 62 `Approved` `SYS-*` appear once in the allocation tables | review against `system_requirements.md` (scripted ID diff) |
+| AC2 | All 61 `Approved` `SYS-*` appear once in the allocation tables | review against `system_requirements.md` (scripted ID diff) |
 | AC3 | Every port has one producer, >= 1 consumer, period, type, scaling, range, init value and an RTE mapping entry; every runnable is in a task | review of `swc_composition.md` |
 | AC4 | CAN signal names, scaling, cycle times and timeouts match `can_matrix.md` | review (every `Com`-mapped port) |
 | AC5 | Worst-case fault reaction latency documented and <= 100 ms | review of section 4.1 |
